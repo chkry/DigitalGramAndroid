@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp"
+    android:gravity="center"
+    android:minHeight="32dp">
+
+    <!-- Timeline Column - centered dot only -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:minHeight="32dp">
+
+        <!-- Top line (hidden) -->
+        <View
+            android:id="@+id/lineTop"
+            android:layout_width="2dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <!-- Dot -->
+        <View
+            android:id="@+id/timelineDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/timeline_dot" />
+
+        <!-- Bottom line (hidden) -->
+        <View
+            android:id="@+id/lineBottom"
+            android:layout_width="2dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout>

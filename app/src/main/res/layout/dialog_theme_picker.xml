@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/background_beige"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/theme"
+        android:textSize="18sp"
+        android:textColor="@color/text_dark"
+        android:fontFamily="sans-serif-condensed"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <RadioGroup
+        android:id="@+id/themeRadioGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/themeDefault"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="DEFAULT"
+            android:textSize="16sp"
+            android:textColor="@color/text_dark"
+            android:fontFamily="sans-serif-condensed"
+            android:button="@null"
+            android:drawableEnd="?android:attr/listChoiceIndicatorSingle"
+            android:paddingHorizontal="8dp" />
+
+        <RadioButton
+            android:id="@+id/themeDark"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="DARK"
+            android:textSize="16sp"
+            android:textColor="@color/text_dark"
+            android:fontFamily="sans-serif-condensed"
+            android:button="@null"
+            android:drawableEnd="?android:attr/listChoiceIndicatorSingle"
+            android:paddingHorizontal="8dp" />
+
+        <RadioButton
+            android:id="@+id/themeLight"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="LIGHT"
+            android:textSize="16sp"
+            android:textColor="@color/text_dark"
+            android:fontFamily="sans-serif-condensed"
+            android:button="@null"
+            android:drawableEnd="?android:attr/listChoiceIndicatorSingle"
+            android:paddingHorizontal="8dp" />
+
+    </RadioGroup>
+
+</LinearLayout>

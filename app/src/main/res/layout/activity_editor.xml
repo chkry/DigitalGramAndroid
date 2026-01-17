@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_beige"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/background_beige"
+        android:fitsSystemWindows="true"
+        app:elevation="0dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/background_beige"
+            app:titleTextColor="@color/text_dark" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <LinearLayout
+        android:id="@+id/contentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Date Header -->
+        <LinearLayout
+            android:id="@+id/dateContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <LinearLayout
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:background="@drawable/date_background"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/dayName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-condensed"
+                    android:text="MON"
+                    android:textColor="@color/accent_red"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/dayNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-condensed"
+                    android:text="15"
+                    android:textColor="@color/text_dark"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/monthYear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:fontFamily="sans-serif-condensed"
+                android:text="JANUARY 2026"
+                android:textColor="@color/text_dark"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            
+            <!-- Preview toggle -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+            
+            <Button
+                android:id="@+id/previewToggle"
+                style="?attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Preview"
+                android:textColor="@color/accent_red"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <!-- Markdown Toolbar - moved above the editor -->
+        <HorizontalScrollView
+            android:id="@+id/markdownToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Timestamp first -->
+                <Button
+                    android:id="@+id/btnTimestamp"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="🕐"
+                    android:textColor="@color/text_dark"
+                    android:textSize="18sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:layout_marginHorizontal="4dp"
+                    android:background="@color/text_gray" />
+
+                <Button
+                    android:id="@+id/btnBold"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="B"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_dark"
+                    android:textSize="18sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <Button
+                    android:id="@+id/btnItalic"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="I"
+                    android:textStyle="italic"
+                    android:textColor="@color/text_dark"
+                    android:textSize="18sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <Button
+                    android:id="@+id/btnCode"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="&lt;/&gt;"
+                    android:textColor="@color/text_dark"
+                    android:textSize="14sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:layout_marginHorizontal="4dp"
+                    android:background="@color/text_gray" />
+
+                <Button
+                    android:id="@+id/btnH1"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="H1"
+                    android:textColor="@color/text_dark"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <Button
+                    android:id="@+id/btnH2"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="H2"
+                    android:textColor="@color/text_dark"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <Button
+                    android:id="@+id/btnH3"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="H3"
+                    android:textColor="@color/text_dark"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:layout_marginHorizontal="4dp"
+                    android:background="@color/text_gray" />
+
+                <Button
+                    android:id="@+id/btnList"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="•"
+                    android:textColor="@color/text_dark"
+                    android:textSize="24sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <Button
+                    android:id="@+id/btnCheckbox"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="☐"
+                    android:textColor="@color/text_dark"
+                    android:textSize="20sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <Button
+                    android:id="@+id/btnLink"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="🔗"
+                    android:textColor="@color/text_dark"
+                    android:textSize="18sp"
+                    android:background="@drawable/toolbar_button_bg" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:layout_marginHorizontal="4dp"
+                    android:background="@color/text_gray" />
+
+                <Button
+                    android:id="@+id/btnCodeBlock"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="56dp"
+                    android:layout_height="48dp"
+                    android:text="```"
+                    android:textColor="@color/text_dark"
+                    android:textSize="14sp"
+                    android:fontFamily="monospace"
+                    android:background="@drawable/toolbar_button_bg" />
+
+            </LinearLayout>
+
+        </HorizontalScrollView>
+
+        <!-- Content Editor -->
+        <FrameLayout
+            android:id="@+id/contentFrame"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/border_card"
+            android:padding="2dp">
+
+            <EditText
+                android:id="@+id/contentEditText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/background_beige"
+                android:gravity="top|start"
+                android:hint="@string/write_entry"
+                android:inputType="textMultiLine|textCapSentences"
+                android:padding="16dp"
+                android:textColor="@color/text_dark"
+                android:textColorHint="@color/text_hint"
+                android:textSize="16sp" />
+            
+            <!-- Preview TextView (hidden by default) -->
+            <ScrollView
+                android:id="@+id/previewScroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+                
+                <TextView
+                    android:id="@+id/previewText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:textColor="@color/text_dark"
+                    android:textSize="16sp"
+                    android:linksClickable="true"
+                    android:autoLink="web" />
+            </ScrollView>
+
+        </FrameLayout>
+
+        <!-- Done Button -->
+        <Button
+            android:id="@+id/doneButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/accent_red"
+            android:fontFamily="sans-serif-condensed"
+            android:text="@string/done"
+            android:textColor="@android:color/white"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</LinearLayout>
