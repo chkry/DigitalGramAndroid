@@ -1,6 +1,8 @@
 package com.digitalgram.android
 
 import android.app.DatePickerDialog
+import android.content.Context
+import android.graphics.Rect
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -10,15 +12,20 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewTreeObserver
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.digitalgram.android.data.AppSettings
 import com.digitalgram.android.data.JournalDatabase
 import com.digitalgram.android.data.JournalEntry
 import com.digitalgram.android.databinding.ActivityEditorBinding
+import com.digitalgram.android.util.ImageUtils
 import com.digitalgram.android.util.MarkdownParser
 import com.digitalgram.android.util.ThemeColors
 import kotlinx.coroutines.launch
@@ -37,6 +44,11 @@ class EditorActivity : AppCompatActivity() {
     private var selectedDate: Calendar = Calendar.getInstance()
     private var isNewEntry = true
     private var isPreviewMode = false
+    private var isKeyboardVisible = false
+    private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var currentKeyboardHeight = 0
+    private var scrollHandler = Handler(Looper.getMainLooper())
+    private var scrollRunnable: Runnable? = null
     
     companion object {
         const val EXTRA_DATE_KEY = "extra_date_key"
@@ -44,6 +56,10 @@ class EditorActivity : AppCompatActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Enable edge-to-edge display for seamless status/navigation bar blending
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
         binding = ActivityEditorBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
@@ -64,12 +80,182 @@ class EditorActivity : AppCompatActivity() {
         }
         
         applyThemeColors()
+        setupWindowInsets()
+        setupKeyboardDetection()
+        setupEditTextScrolling()
         loadEntry()
         setupDateDisplay()
         setupDoneButton()
         setupMarkdownToolbar()
         setupPreviewToggle()
         setupAutoSave()
+    }
+    
+    private fun setupWindowInsets() {
+        // Handle system window insets for proper padding with edge-to-edge display
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            
+            // Apply top padding to appBarLayout to account for status bar
+            binding.appBarLayout.setPadding(
+                binding.appBarLayout.paddingLeft,
+                systemBars.top,
+                binding.appBarLayout.paddingRight,
+                binding.appBarLayout.paddingBottom
+            )
+            
+            // Don't apply bottom padding here - keyboard handling manages bottom space
+            // and we don't want to push the Done button off screen
+            
+            insets
+        }
+    }
+    
+    private fun setupKeyboardDetection() {
+        // Use OnGlobalLayoutListener to detect keyboard and adjust layout
+        globalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
+            val rootView = binding.root
+            val visibleRect = Rect()
+            rootView.getWindowVisibleDisplayFrame(visibleRect)
+            
+            val screenHeight = rootView.rootView.height
+            val keyboardHeight = screenHeight - visibleRect.bottom
+            
+            // Keyboard is considered visible if it takes more than 15% of screen height
+            val keyboardVisible = keyboardHeight > screenHeight * 0.15
+            
+            // Only update if keyboard height actually changed to prevent flickering
+            if (keyboardVisible && keyboardHeight != currentKeyboardHeight) {
+                currentKeyboardHeight = keyboardHeight
+                isKeyboardVisible = true
+                
+                // Remove done button margin when keyboard is visible
+                val doneButtonLayoutParams = binding.doneButton.layoutParams as android.widget.LinearLayout.LayoutParams
+                doneButtonLayoutParams.bottomMargin = 0
+                binding.doneButton.layoutParams = doneButtonLayoutParams
+                
+                // Resize contentFrame to sit just above keyboard (with 10% extra space)
+                val contentFrameLayoutParams = binding.contentFrame.layoutParams as android.widget.LinearLayout.LayoutParams
+                contentFrameLayoutParams.bottomMargin = (keyboardHeight * 0.8).toInt()
+                binding.contentFrame.layoutParams = contentFrameLayoutParams
+                
+                // Add small bottom padding to editScrollView for scroll space
+                binding.editScrollView.setPadding(
+                    binding.editScrollView.paddingLeft,
+                    binding.editScrollView.paddingTop,
+                    binding.editScrollView.paddingRight,
+                    100  // Small padding for scroll space
+                )
+                
+                // Debounced scroll to cursor to prevent flickering
+                scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
+                scrollRunnable = Runnable {
+                    scrollToCursorPosition()
+                }
+                scrollHandler.postDelayed(scrollRunnable!!, 150)
+                
+            } else if (!keyboardVisible && isKeyboardVisible) {
+                currentKeyboardHeight = 0
+                isKeyboardVisible = false
+                
+                // Cancel any pending scroll
+                scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
+                
+                // Restore original contentFrame margin
+                val contentFrameLayoutParams = binding.contentFrame.layoutParams as android.widget.LinearLayout.LayoutParams
+                contentFrameLayoutParams.bottomMargin = 0
+                binding.contentFrame.layoutParams = contentFrameLayoutParams
+                
+                // Restore original padding
+                binding.editScrollView.setPadding(
+                    binding.editScrollView.paddingLeft,
+                    binding.editScrollView.paddingTop,
+                    binding.editScrollView.paddingRight,
+                    0
+                )
+                
+                // Add margin under done button when keyboard is not visible
+                val doneButtonLayoutParams = binding.doneButton.layoutParams as android.widget.LinearLayout.LayoutParams
+                doneButtonLayoutParams.bottomMargin = 32.dpToPx()
+                binding.doneButton.layoutParams = doneButtonLayoutParams
+            }
+        }
+        binding.root.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
+        
+        // Also scroll to cursor whenever selection changes
+        binding.contentEditText.setOnClickListener {
+            if (isKeyboardVisible) {
+                scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
+                scrollRunnable = Runnable {
+                    scrollToCursorPosition()
+                }
+                scrollHandler.postDelayed(scrollRunnable!!, 100)
+            }
+        }
+    }
+    
+    private fun scrollToCursorPosition() {
+        val editText = binding.contentEditText
+        val layout = editText.layout ?: return
+        
+        val cursorPos = editText.selectionEnd
+        val cursorLine = layout.getLineForOffset(cursorPos)
+        val cursorY = layout.getLineTop(cursorLine)
+        val lineHeight = layout.getLineBottom(cursorLine) - layout.getLineTop(cursorLine)
+        
+        // Get the visible height of the ScrollView
+        val scrollViewHeight = binding.editScrollView.height
+        val currentScrollY = binding.editScrollView.scrollY
+        
+        // Calculate cursor bottom position
+        val cursorBottom = cursorY + lineHeight + editText.paddingTop
+        val visibleBottom = currentScrollY + scrollViewHeight - binding.editScrollView.paddingBottom
+        
+        if (cursorBottom > visibleBottom - lineHeight) {
+            // Scroll to make cursor visible with padding
+            val targetScroll = cursorBottom - scrollViewHeight + binding.editScrollView.paddingBottom + lineHeight * 2
+            binding.editScrollView.smoothScrollTo(0, maxOf(0, targetScroll))
+        } else if (cursorY < currentScrollY) {
+            // Cursor is above visible area
+            binding.editScrollView.smoothScrollTo(0, maxOf(0, cursorY - lineHeight))
+        }
+    }
+    
+    private fun Int.dpToPx(): Int {
+        return (this * resources.displayMetrics.density).toInt()
+    }
+    
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        currentFocus?.let {
+            imm.hideSoftInputFromWindow(it.windowToken, 0)
+        } ?: run {
+            imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
+        }
+    }
+    
+    private fun scrollToEditText() {
+        // Scroll the editScrollView to show the cursor
+        binding.editScrollView.post {
+            val editText = binding.contentEditText
+            val cursorLine = editText.layout?.getLineForOffset(editText.selectionStart) ?: 0
+            val lineTop = editText.layout?.getLineTop(cursorLine) ?: 0
+            
+            binding.editScrollView.smoothScrollTo(0, lineTop)
+        }
+    }
+    
+    private fun setupEditTextScrolling() {
+        // Scroll to cursor when EditText gains focus
+        binding.contentEditText.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.contentEditText.postDelayed({ scrollToEditText() }, 300)
+            }
+        }
+    }
+    
+    private fun scrollToCursor() {
+        scrollToEditText()
     }
     
     private fun setupAutoSave() {
@@ -84,11 +270,25 @@ class EditorActivity : AppCompatActivity() {
                 // Cancel any pending save
                 saveRunnable?.let { handler.removeCallbacks(it) }
                 
+                // Debounced scroll to keep cursor visible after text change
+                if (isKeyboardVisible) {
+                    scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
+                    scrollRunnable = Runnable {
+                        scrollToCursorPosition()
+                    }
+                    scrollHandler.postDelayed(scrollRunnable!!, 100)
+                }
+                
                 // Schedule a new save after 2 seconds of no typing
                 saveRunnable = Runnable {
                     autoSaveEntry()
                 }
                 handler.postDelayed(saveRunnable!!, 2000)
+                
+                // Scroll to cursor after text changes when keyboard is visible
+                if (isKeyboardVisible) {
+                    binding.contentEditText.postDelayed({ scrollToEditText() }, 50)
+                }
             }
         })
     }
@@ -123,11 +323,13 @@ class EditorActivity : AppCompatActivity() {
         if (wallpaperUri != null) {
             try {
                 val uri = android.net.Uri.parse(wallpaperUri)
-                val inputStream = contentResolver.openInputStream(uri)
-                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                val drawable = android.graphics.drawable.BitmapDrawable(resources, bitmap)
-                binding.rootLayout.background = drawable
-                inputStream?.close()
+                val bitmap = ImageUtils.loadOrientedBitmap(contentResolver, uri)
+                val drawable = bitmap?.let { android.graphics.drawable.BitmapDrawable(resources, it) }
+                if (drawable != null) {
+                    binding.rootLayout.background = drawable
+                } else {
+                    binding.rootLayout.setBackgroundColor(themeColors.backgroundColor)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 // Fallback to theme background color if wallpaper fails
@@ -163,12 +365,14 @@ class EditorActivity : AppCompatActivity() {
             binding.previewScroll.setBackgroundColor(themeColors.backgroundColor)
         }
         
-        // Apply background to the content frame (has border_card drawable)
-        val contentFrameDrawable = binding.contentFrame.background
-        if (contentFrameDrawable is android.graphics.drawable.GradientDrawable) {
-            contentFrameDrawable.setColor(themeColors.backgroundColor)
-            contentFrameDrawable.setStroke(2, themeColors.borderColor)
+        // Apply background to the content frame with border - always create new drawable
+        val contentFrameDrawable = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setColor(themeColors.backgroundColor)
+            setStroke(2.dpToPx(), themeColors.borderColor)
+            cornerRadius = 0f
         }
+        binding.contentFrame.background = contentFrameDrawable
         
         // Apply toolbar title color
         binding.toolbar.setTitleTextColor(themeColors.textColor)
@@ -429,6 +633,9 @@ class EditorActivity : AppCompatActivity() {
     
     private fun updatePreviewMode() {
         if (isPreviewMode) {
+            // Hide keyboard when entering preview mode
+            hideKeyboard()
+            
             // Show preview
             binding.contentEditText.visibility = View.GONE
             binding.previewScroll.visibility = View.VISIBLE
@@ -591,6 +798,14 @@ class EditorActivity : AppCompatActivity() {
                 true
             }
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Clean up the global layout listener
+        globalLayoutListener?.let {
+            binding.root.viewTreeObserver.removeOnGlobalLayoutListener(it)
         }
     }
 }

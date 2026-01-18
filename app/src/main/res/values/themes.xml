@@ -8,10 +8,12 @@
         <item name="colorSecondaryVariant">@color/accent_red</item>
         <item name="colorOnSecondary">@android:color/white</item>
         <item name="android:windowBackground">@color/background_beige</item>
-        <item name="android:statusBarColor">@color/background_beige</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">@color/background_beige</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 
     <style name="Theme.DigitalGram" parent="Base.Theme.DigitalGram" />

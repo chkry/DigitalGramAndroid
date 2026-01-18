@@ -25,15 +25,16 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- Fixed content container - no ScrollView wrapper -->
     <LinearLayout
         android:id="@+id/contentContainer"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingHorizontal="16dp"
+        android:paddingTop="16dp">
 
-        <!-- Date Header -->
+        <!-- Date Header - Fixed -->
         <LinearLayout
             android:id="@+id/dateContainer"
             android:layout_width="match_parent"
@@ -263,7 +264,7 @@
 
         </HorizontalScrollView>
 
-        <!-- Content Editor -->
+        <!-- Content Editor - Scrollable, takes remaining space -->
         <FrameLayout
             android:id="@+id/contentFrame"
             android:layout_width="match_parent"
@@ -272,18 +273,31 @@
             android:background="@drawable/border_card"
             android:padding="2dp">
 
-            <EditText
-                android:id="@+id/contentEditText"
+            <!-- Scrollable EditText wrapper -->
+            <ScrollView
+                android:id="@+id/editScrollView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/background_beige"
-                android:gravity="top|start"
-                android:hint="@string/write_entry"
-                android:inputType="textMultiLine|textCapSentences"
-                android:padding="16dp"
-                android:textColor="@color/text_dark"
-                android:textColorHint="@color/text_hint"
-                android:textSize="16sp" />
+                android:fillViewport="true">
+
+                <EditText
+                    android:id="@+id/contentEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="200dp"
+                    android:background="@color/background_beige"
+                    android:gravity="top|start"
+                    android:hint="@string/write_entry"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:padding="16dp"
+                    android:textColor="@color/text_dark"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="16sp"
+                    android:textCursorDrawable="@null"
+                    android:cursorVisible="true"
+                    android:scrollbars="vertical" />
+
+            </ScrollView>
             
             <!-- Preview TextView (hidden by default) -->
             <ScrollView
@@ -305,12 +319,13 @@
 
         </FrameLayout>
 
-        <!-- Done Button -->
+        <!-- Done Button - Fixed at bottom -->
         <Button
             android:id="@+id/doneButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="32dp"
             android:backgroundTint="@color/accent_red"
             android:fontFamily="sans-serif-condensed"
             android:text="@string/done"

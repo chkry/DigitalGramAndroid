@@ -215,7 +215,7 @@ object MarkdownParser {
             val contentGroup = match.groups[1]!!
             
             // Remove the ** markers
-            builder.delete(fullMatch.last, fullMatch.last + 1)  // Remove trailing **
+            builder.delete(fullMatch.last - 1, fullMatch.last + 1)  // Remove trailing **
             builder.delete(fullMatch.first, fullMatch.first + 2) // Remove leading **
             
             // Apply bold style to the content (now at fullMatch.first)

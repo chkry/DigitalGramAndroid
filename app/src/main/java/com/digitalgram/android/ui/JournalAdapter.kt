@@ -9,6 +9,7 @@ import com.digitalgram.android.data.AppSettings
 import com.digitalgram.android.data.JournalEntry
 import com.digitalgram.android.databinding.ItemDiaryEntryBinding
 import com.digitalgram.android.databinding.ItemTimelineDotBinding
+import com.digitalgram.android.util.MarkdownParser
 import com.digitalgram.android.util.ThemeColors
 import java.text.SimpleDateFormat
 import java.util.*
@@ -208,7 +209,13 @@ class JournalAdapter(
             
             binding.dayName.text = dayFormat.format(date).uppercase()
             binding.dayNumber.text = dateFormat.format(date)
-            binding.entryContent.text = entry.content
+            val previewText = MarkdownParser.parse(
+                entry.content,
+                themeColors.linkColor,
+                themeColors.codeBackgroundColor,
+                themeColors.textColor
+            )
+            binding.entryContent.text = previewText
             
             // Apply font size
             binding.entryContent.textSize = fontSizeSp

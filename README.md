@@ -1,44 +1,23 @@
 # DigitalGram Android
 
-A beautiful, privacy-focused diary/journal app for Android with Material Design 3 and elegant theming.
+A beautiful diary/journal app for Android with Material Design 3 and a custom beige aesthetic.
 
 ## Features
 
-### Core Functionality
-- 📝 **Rich Text Editing** - Create and edit diary entries with markdown preview
-- 📅 **Date-based Organization** - Browse entries by date with intuitive navigation
-- 🔍 **Smart Search** - Find entries quickly by content
-- 💾 **Local Storage** - Your data stays on your device with Room database
-- 🔒 **Biometric Security** - Optional fingerprint/face unlock
-- 📤 **Import/Export** - Backup your data with JSON export/import
-- 🗄️ **Database Management** - Switch, merge, delete, and import databases
-
-### Customization
-- 🎨 **20 Themes** - Light, Dark, Sepia, Mint, Purple, Peach, Gray, Frost, Cyber, Lab, AMOLED, Vampire, Rose Gold, Cherry Blossom, Ocean Breeze, Sunset, Forest, Midnight Purple
-- 🖼️ **Wallpaper Support** - Set custom backgrounds with transparency
-- ⚙️ **Per-Theme Settings** - Customize accent colors, fonts, and backgrounds
-- 🔤 **Font Selection** - Choose from multiple font families
-- 💾 **Auto-save** - Never lose your work with automatic saving
-
-### User Experience
-- 🕐 **Real-time Date/Time** - Current date and time displayed in title bar
-- 📱 **Edge-to-edge Display** - Modern full-screen experience
-- 🎯 **Material Design 3** - Beautiful, consistent UI
-- 🌓 **Dark Mode Support** - Comfortable viewing in any lighting
+- 📝 Create and edit diary entries
+- 🎨 Beautiful beige-themed UI matching Daygram aesthetic
+- 💾 Local Room database storage
+- 📅 Date-based organization
+- 🔒 Privacy-focused (local storage only)
 
 ## Technical Stack
 
-- **Language**: Kotlin 1.9.24
-- **Min SDK**: 26 (Android 8.0 Oreo)
-- **Target SDK**: 35 (Android 15)
-- **Compile SDK**: 35
+- **Language**: Kotlin
+- **Min SDK**: 26 (Android 8.0)
+- **Target SDK**: 34 (Android 14)
 - **Architecture**: MVVM with LiveData
-- **Database**: Room 2.6.1
-- **UI**: Material Design 3 (Material Components 1.11.0)
-- **Build System**: Gradle 8.7 with Kotlin DSL
-- **Security**: AndroidX Biometric
-- **Storage**: Android Storage Access Framework (SAF)
-- **JSON**: Gson for data serialization
+- **Database**: Room
+- **UI**: Material Design 3
 
 ## Building the APK
 
@@ -109,106 +88,23 @@ buildTypes {
 
 ## Database Schema
 
-### DiaryEntry Table(milliseconds) of entry date |
+### DiaryEntry Table
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Long | Auto-increment primary key |
+| date | Long | Unix timestamp of entry date |
 | content | String | Diary entry text content |
-| createdAt | Long | Creation timestamp (milliseconds) |
-| updatedAt | Long | Last update timestamp (milliseconds) |
+| createdAt | Long | Creation timestamp |
+| updatedAt | Long | Last update timestamp |
 
-## Key Features Detail
-
-### Theme System
-- **20 Built-in Themes**: Each with carefully selected color palettes
-- **Custom Overrides**: Per-theme customization of:
-  -Default Theme Design
+## UI Design
 
 - **Background**: Beige (#F5F1E8)
-- **Surface**: White (#FFFFFF)
-- **Primary**: Dark gray (#333333)
+- **Borders**: Black 2dp borders on cards
 - **Accent**: Red (#B85450) for dates and actions
-- **Border**: Black 2dp borders on cards
-- **Typography**: Default Android sans-serif
-- **Cards**: Date header with striped background + content area
-- **Transparency**: 70% opacity for entries when wallpaper is activeary
-- **Local Storage**: All data stored locally using Room database
-- **No Cloud Sync**: Your entries stay private on your device
-
-### Data Management      # Main timeline/list screen
-│   ├── EditorActivity.kt                  # Entry editor with markdown preview
-│   ├── SettingsActivity.kt                # Settings and theme management
-│   ├── DatabaseManagerActivity.kt         # Database management UI
-│   ├── data/
-│   │   ├── DiaryEntry.kt                  # Room entity
-│   │   ├── DiaryDao.kt                    # Database access object
-│   │   ├── DiaryDatabase.kt               # Room database instance
-│   │   ├── AppSettings.kt                 # SharedPreferences wrapper
-│   │   └── ThemeColors.kt                 # Theme definitions
-│   └── ui/
-│       ├── DiaryViewModel.kt              # Main ViewModel
-│       ├── DiaryViewModelFactory.kt       # ViewModel factory
-│       └── DiaryAdapter.kt                # RecyclerView adapter
-├── res/
-│   ├── layout/
-│   │   ├── activity_main.xml              # Main screen layout
-│   │   ├── activity_editor.xml            # Editor layout
-│   │   ├── activity_settings.xml          # Settings layout
-│   │   ├── activity_database_manager.xml  # Database manager layout
-│   │   ├── item_diary_entry.xml           # List item layout
-│   │   └── dialog_*.xml                   # Dialog layouts
-│   ├── drawable/
-│   │   └── striped_background.xml         # Striped pattern for date headers
-│   ├── values/
-│   │   ├── colors.xml                     # Color resources
-│   │   ├── strings.xml                    # String resources
-│   │   └── themes.xml                     # App themes
-│   └── menu/
-│       ├── menu_main.xml                  # Main toolbar menu
-│       └── menu_editor.xml                # Editor toolbar menu
-└── AndroidManifest.xml                    # App manifest
-```
-
-## Screenshots
-
-*(Add your app screenshots here)*
-
-## Installation
-
-### From APK
-1. Download the latest APK from releases
-2. Enable "Install from Unknown Sources" in Android settings
-3. Install the APK
-
-### From Source
-See "Building the APK" section above
-
-## Privacy
-
-DigitalGram Android is designed with privacy in mind:
-- ✅ All data stored locally on your device
-- ✅ No internet permission required
-- ✅ No analytics or tracking
-- ✅ No ads
-- ✅ Optional biometric lock
-- ✅ Your entries never leave your device
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-**Chakradhar Reddy**
-
-Created as the Android companion to the DigitalGram macOS app.
-
-## Acknowledgments
-
-- Material Design 3 for the beautiful UI components
-- AndroidX libraries for modern Android development
-- Room database for reliable local storage content area
+- **Typography**: Sans-serif condensed for headers
+- **Cards**: Date box with striped background + content area
 
 ## Project Structure
 

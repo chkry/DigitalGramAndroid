@@ -18,6 +18,7 @@ import com.digitalgram.android.data.AppSettings
 import com.digitalgram.android.data.JournalDatabase
 import com.digitalgram.android.databinding.ActivityMainBinding
 import com.digitalgram.android.ui.JournalAdapter
+import com.digitalgram.android.util.ImageUtils
 import com.digitalgram.android.util.ThemeColors
 import java.text.SimpleDateFormat
 import java.util.*
@@ -53,13 +54,14 @@ class MainActivity : AppCompatActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
         
-        // Enable edge-to-edge display
+        // Enable edge-to-edge display before setting content
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
         settings = AppSettings.getInstance(this)
+        
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
         
         // Initialize database
         database = JournalDatabase.getInstance(applicationContext)
@@ -67,35 +69,63 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.title = "DigitalGram"
         
+        setupWindowInsets()
         setupRecyclerView()
         setupBottomBar()
         observeEntries()
         applySettings()
         updateMonthYear()
-        
-        // Handle system window insets for RecyclerView - wait for layout
-        binding.bottomBar.post {
-            binding.recyclerView.setOnApplyWindowInsetsListener { view, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                // Calculate bottom bar height + system navigation bar
+    }
+    
+    private fun setupWindowInsets() {
+        // Handle system window insets for proper padding with edge-to-edge display
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.coordinatorLayout) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            
+            // Apply top padding to appBarLayout to account for status bar
+            binding.appBarLayout.setPadding(
+                binding.appBarLayout.paddingLeft,
+                systemBars.top,
+                binding.appBarLayout.paddingRight,
+                binding.appBarLayout.paddingBottom
+            )
+            
+            // Handle bottom bar padding for navigation bar
+            binding.bottomBar.setPadding(
+                binding.bottomBar.paddingLeft,
+                binding.bottomBar.paddingTop,
+                binding.bottomBar.paddingRight,
+                systemBars.bottom
+            )
+            
+            // Handle RecyclerView padding - wait for layout
+            binding.bottomBar.post {
                 val bottomBarHeight = binding.bottomBar.height
-                val totalBottomPadding = bottomBarHeight + systemBars.bottom
-                view.setPadding(
-                    view.paddingLeft,
-                    view.paddingTop,
-                    view.paddingRight,
+                val totalBottomPadding = bottomBarHeight
+                binding.recyclerView.setPadding(
+                    binding.recyclerView.paddingLeft,
+                    binding.recyclerView.paddingTop,
+                    binding.recyclerView.paddingRight,
                     totalBottomPadding
                 )
-                insets
             }
-            // Trigger initial padding calculation
-            binding.recyclerView.requestApplyInsets()
+            
+            insets
         }
     }
     
     override fun onResume() {
         super.onResume()
         applySettings()
+        
+        // Reset window layout to ensure proper display after returning from editor
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
+        // Force layout refresh to fix any cramped layout issues
+        binding.coordinatorLayout.post {
+            binding.coordinatorLayout.requestLayout()
+            binding.recyclerView.requestLayout()
+        }
         
         // Start date/time updates
         updateDateTime()
@@ -145,8 +175,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             windowInsetsController.show(WindowInsetsCompat.Type.statusBars())
         }
-        
-        // Apply theme colors
+
+        // Apply theme colors after fullscreen handling
         applyThemeColors()
         
         // Update adapter font size
@@ -163,11 +193,13 @@ class MainActivity : AppCompatActivity() {
         if (wallpaperUri != null) {
             try {
                 val uri = android.net.Uri.parse(wallpaperUri)
-                val inputStream = contentResolver.openInputStream(uri)
-                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
-                val drawable = android.graphics.drawable.BitmapDrawable(resources, bitmap)
-                binding.coordinatorLayout.background = drawable
-                inputStream?.close()
+                val bitmap = ImageUtils.loadOrientedBitmap(contentResolver, uri)
+                val drawable = bitmap?.let { android.graphics.drawable.BitmapDrawable(resources, it) }
+                if (drawable != null) {
+                    binding.coordinatorLayout.background = drawable
+                } else {
+                    binding.coordinatorLayout.setBackgroundColor(themeColors.backgroundColor)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 // Fallback to theme background color if wallpaper fails
@@ -227,15 +259,17 @@ class MainActivity : AppCompatActivity() {
         // Apply to add button tint
         binding.addButton.setColorFilter(themeColors.buttonColor)
         
+        // Apply to settings button tint
+        binding.settingsButton.setColorFilter(themeColors.buttonColor)
+        
         // Apply to progress bars
         binding.progressFilled.setBackgroundColor(themeColors.accentColor)
         binding.progressEmpty.setBackgroundColor(themeColors.dotColor)
-        
-        // Update status bar color
+
+        // Update status bar and navigation bar - same as EditorActivity
         window.statusBarColor = themeColors.backgroundColor
         window.navigationBarColor = themeColors.backgroundColor
         
-        // Update status bar icons for dark/light themes
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.isAppearanceLightStatusBars = !isDark
         insetsController.isAppearanceLightNavigationBars = !isDark
@@ -289,6 +323,12 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
         binding.progressEmpty.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+        
+        // Settings button
+        binding.settingsButton.setOnClickListener {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }

@@ -136,6 +136,7 @@ class SettingsActivity : AppCompatActivity() {
     
     private fun applyThemeColors() {
         val themeColors = com.digitalgram.android.util.ThemeColors.getTheme(settings.theme, this)
+        val isDark = com.digitalgram.android.util.ThemeColors.isDarkTheme(settings.theme)
         
         // Apply background color
         binding.root.setBackgroundColor(themeColors.backgroundColor)
@@ -147,6 +148,14 @@ class SettingsActivity : AppCompatActivity() {
         // Apply toolbar color
         binding.toolbar.setBackgroundColor(themeColors.backgroundColor)
         supportActionBar?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(themeColors.backgroundColor))
+        
+        // Update status bar and navigation bar colors
+        window.statusBarColor = themeColors.backgroundColor
+        window.navigationBarColor = themeColors.backgroundColor
+        
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = !isDark
+        insetsController.isAppearanceLightNavigationBars = !isDark
     }
     
     private fun setupAboutLinks() {
@@ -833,6 +842,18 @@ class SettingsActivity : AppCompatActivity() {
             settings.useSystemFont = true
             updateSystemFontUI()
         }
+
+        // Fullscreen toggle
+        binding.fullscreenOff.setOnClickListener {
+            settings.fullscreen = false
+            applyFullscreenSetting()
+            updateFullscreenUI()
+        }
+        binding.fullscreenOn.setOnClickListener {
+            settings.fullscreen = true
+            applyFullscreenSetting()
+            updateFullscreenUI()
+        }
     }
     
     private fun setupPasscode() {
@@ -990,6 +1011,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.fontFamilyValue.text = AppSettings.ALL_FONTS.find { it.first == settings.fontFamily }?.second ?: "Bookerly"
         updateFontSizeUI()
         updateSystemFontUI()
+        updateFullscreenUI()
         updateBorderUI()
         updatePasscodeUI()
         updateFingerprintUI()
@@ -1031,6 +1053,15 @@ class SettingsActivity : AppCompatActivity() {
         )
         binding.systemFontOn.setBackgroundResource(
             if (settings.useSystemFont) R.drawable.toggle_button_selected else R.drawable.toggle_button
+        )
+    }
+
+    private fun updateFullscreenUI() {
+        binding.fullscreenOff.setBackgroundResource(
+            if (!settings.fullscreen) R.drawable.toggle_button_selected else R.drawable.toggle_button
+        )
+        binding.fullscreenOn.setBackgroundResource(
+            if (settings.fullscreen) R.drawable.toggle_button_selected else R.drawable.toggle_button
         )
     }
     
