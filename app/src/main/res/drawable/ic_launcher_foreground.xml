@@ -3,18 +3,48 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    
+    <!-- Background -->
     <path
         android:fillColor="#F5F1E8"
         android:pathData="M0,0h108v108h-108z"/>
+    
+    <!-- Large black circle -->
     <path
-        android:fillColor="#3C3C3C"
-        android:pathData="M35,35h38v38h-38z"
-        android:strokeWidth="4"
-        android:strokeColor="#2C2C2C"/>
+        android:fillColor="#1A1A1A"
+        android:pathData="M54,24m-20,0a20,20 0,1,1 40,0a20,20 0,1,1 -40,0"/>
+    
+    <!-- FontAwesome Book-Journal icon (scaled and centered in circle) -->
+    <group
+        android:scaleX="0.055"
+        android:scaleY="0.055"
+        android:translateX="23.5"
+        android:translateY="3.5">
+        <path
+            android:fillColor="#F5F1E8"
+            android:pathData="M96,0C107.5,0 117.4,8.19 119.6,19.51L120.1,21.82C124.6,23.11 128,27.29 128,32.14V32.14V448c0,17.67 -14.33,32 -32,32H32c-17.67,0 -32,-14.33 -32,-32V32C0,14.33 14.33,0 32,0H96zM32,48c-8.84,0 -16,7.16 -16,16v80c0,8.84 7.16,16 16,16H96c8.84,0 16,-7.16 16,-16V64c0,-8.84 -7.16,-16 -16,-16H32zM32,208H96c8.84,0 16,7.16 16,16v64c0,8.84 -7.16,16 -16,16H32c-8.84,0 -16,-7.16 -16,-16V224C16,215.16 23.16,208 32,208zM112,384v64H32V384H112z"/>
+    </group>
+    
+    <!-- JOURNAL text -->
     <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M40,45h28M40,54h28M40,63h28"
-        android:strokeWidth="2"
-        android:strokeColor="#B85450"
-        android:strokeLineCap="round"/>
+        android:fillColor="#C4B5A0"
+        android:pathData="M33,63h2.2v7.5c0,1.5 -1,2.5 -2.5,2.5h-1.2v-1.8h1c0.5,0 0.5,-0.3 0.5,-0.7z"/>
+    <path
+        android:fillColor="#C4B5A0"
+        android:pathData="M37,63h3c1.4,0 2.5,1.1 2.5,2.5v4c0,1.4 -1.1,2.5 -2.5,2.5h-3c-1.4,0 -2.5,-1.1 -2.5,-2.5v-4c0,-1.4 1.1,-2.5 2.5,-2.5zm0,1.8c-0.4,0 -0.7,0.3 -0.7,0.7v4c0,0.4 0.3,0.7 0.7,0.7h3c0.4,0 0.7,-0.3 0.7,-0.7v-4c0,-0.4 -0.3,-0.7 -0.7,-0.7z"/>
+    <path
+        android:fillColor="#C4B5A0"
+        android:pathData="M44,63h2.2v6.5c0,0.4 0.3,0.7 0.7,0.7h1.6c0.4,0 0.7,-0.3 0.7,-0.7v-6.5h2.2v6.5c0,1.4 -1.1,2.5 -2.5,2.5h-2.4c-1.4,0 -2.5,-1.1 -2.5,-2.5z"/>
+    <path
+        android:fillColor="#C4B5A0"
+        android:pathData="M53,63h3.5c1.4,0 2.5,1.1 2.5,2.5v1.5h-2v-1.5c0,-0.4 -0.3,-0.7 -0.7,-0.7h-2.6c-0.4,0 -0.7,0.3 -0.7,0.7v4c0,0.4 0.3,0.7 0.7,0.7h2.6v-1.7h-1.8v-1.7h4v5.2h-2v-0.3c-0.3,0.2 -0.7,0.3 -1.2,0.3h-2.3c-1.4,0 -2.5,-1.1 -2.5,-2.5v-4c0,-1.4 1.1,-2.5 2.5,-2.5z"/>
+    <path
+        android:fillColor="#C4B5A0"
+        android:pathData="M61,63h3.5c1.4,0 2.5,1.1 2.5,2.5v4.5h-2v-6.2h-1.8v6.2h-2v-6.2h-1.8v6.2h-2v-4.5c0,-1.4 1.1,-2.5 2.5,-2.5z"/>
+    <path
+        android:fillColor="#C4B5A0"
+        android:pathData="M69,63h2.5l2.8,6.5v-6.5h2v9h-2.5l-2.8,-6.5v6.5h-2z"/>
+    <path
+        android:fillColor="#C4B5A0"
+        android:pathData="M78,63h5v1.8h-2.9v1.7h2.5v1.7h-2.5v1.9h2.9v1.9h-5z"/>
 </vector>
