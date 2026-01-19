@@ -545,6 +545,22 @@ class JournalDatabase private constructor(
             db.execSQL("""
                 CREATE INDEX IF NOT EXISTS diary_idx_0 ON $TABLE_DIARY ($COLUMN_YEAR, $COLUMN_MONTH)
             """)
+            
+            // Create sync metadata table for P2P sync
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS sync_metadata (
+                    entry_id TEXT PRIMARY KEY,
+                    device_id TEXT NOT NULL,
+                    vector_clock INTEGER DEFAULT 0,
+                    is_tombstone INTEGER DEFAULT 0,
+                    FOREIGN KEY(entry_id) REFERENCES $TABLE_DIARY($COLUMN_DATE) ON DELETE CASCADE
+                )
+            """)
+            
+            // Create index for faster sync queries
+            db.execSQL("""
+                CREATE INDEX IF NOT EXISTS idx_sync_updated ON $TABLE_DIARY ($COLUMN_UPDATED)
+            """)
         }
         
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {

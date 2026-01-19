@@ -25,3 +25,20 @@
 
 # Keep ViewModel classes
 -keep class com.digitalgram.android.ui.** { *; }
+
+# Keep annotations
+-dontwarn javax.annotation.**
+-keep class javax.annotation.** { *; }
+-dontwarn javax.annotation.concurrent.**
+
+# Keep security-crypto (Tink library)
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn com.google.crypto.tink.**
+-keepclassmembers class * extends com.google.crypto.tink.shaded.protobuf.GeneratedMessageLite {
+  <fields>;
+}
+
+# Keep Gson/Json related
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn sun.misc.**
