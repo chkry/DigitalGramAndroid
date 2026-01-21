@@ -276,6 +276,7 @@ class MainActivity : AppCompatActivity() {
         
         // Update adapter theme
         adapter.setTheme(themeColors)
+        adapter.setBorderStyle(settings.borderStyle)
     }
     
     private fun setupRecyclerView() {

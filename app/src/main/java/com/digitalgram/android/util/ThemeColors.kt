@@ -19,7 +19,8 @@ data class ThemeColors(
     val buttonColor: Int,
     val dotColor: Int,
     val todayDotColor: Int,
-    val dateBackgroundColor: Int
+    val dateBackgroundColor: Int,
+    val settingsFontColor: Int
 ) {
     companion object {
         fun getTheme(themeName: String, context: Context? = null): ThemeColors {
@@ -35,7 +36,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FF6B6B"),
                     dotColor = Color.parseColor("#BDBDBD"),
                     todayDotColor = Color.parseColor("#FF6B6B"),
-                    dateBackgroundColor = Color.parseColor("#F0F0F0")
+                    dateBackgroundColor = Color.parseColor("#F0F0F0"),
+                    settingsFontColor = Color.parseColor("#1A1A1A")
                 )
                 AppSettings.THEME_DARK -> ThemeColors(
                     backgroundColor = Color.parseColor("#0D1117"),
@@ -48,7 +50,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#F85149"),
                     dotColor = Color.parseColor("#30363D"),
                     todayDotColor = Color.parseColor("#F85149"),
-                    dateBackgroundColor = Color.parseColor("#161B22")
+                    dateBackgroundColor = Color.parseColor("#161B22"),
+                    settingsFontColor = Color.parseColor("#C9D1D9")
                 )
                 // Light Themes - Mood Based
                 AppSettings.THEME_SEPIA -> ThemeColors( // Calm, Nostalgic
@@ -62,7 +65,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#C19A6B"),
                     dotColor = Color.parseColor("#C4B59D"),
                     todayDotColor = Color.parseColor("#C19A6B"),
-                    dateBackgroundColor = Color.parseColor("#EAE0CF")
+                    dateBackgroundColor = Color.parseColor("#EAE0CF"),
+                    settingsFontColor = Color.parseColor("#5C4B37")
                 )
                 AppSettings.THEME_MINT -> ThemeColors( // Fresh, Focused
                     backgroundColor = Color.parseColor("#F0FFF4"),
@@ -75,7 +79,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#48BB78"),
                     dotColor = Color.parseColor("#9AE6B4"),
                     todayDotColor = Color.parseColor("#48BB78"),
-                    dateBackgroundColor = Color.parseColor("#E0F7E9")
+                    dateBackgroundColor = Color.parseColor("#E0F7E9"),
+                    settingsFontColor = Color.parseColor("#22543D")
                 )
                 AppSettings.THEME_LAVENDER -> ThemeColors( // Creative, Dreamy
                     backgroundColor = Color.parseColor("#FAF5FF"),
@@ -88,7 +93,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#9F7AEA"),
                     dotColor = Color.parseColor("#D6BCFA"),
                     todayDotColor = Color.parseColor("#9F7AEA"),
-                    dateBackgroundColor = Color.parseColor("#F0E6FF")
+                    dateBackgroundColor = Color.parseColor("#F0E6FF"),
+                    settingsFontColor = Color.parseColor("#44337A")
                 )
                 AppSettings.THEME_PEACH -> ThemeColors( // Warm, Energetic
                     backgroundColor = Color.parseColor("#FFF5F5"),
@@ -101,7 +107,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FC8181"),
                     dotColor = Color.parseColor("#FEB2B2"),
                     todayDotColor = Color.parseColor("#FC8181"),
-                    dateBackgroundColor = Color.parseColor("#FFE8E8")
+                    dateBackgroundColor = Color.parseColor("#FFE8E8"),
+                    settingsFontColor = Color.parseColor("#742A2A")
                 )
                 AppSettings.THEME_SKY -> ThemeColors( // Clear, Productive
                     backgroundColor = Color.parseColor("#EBF8FF"),
@@ -114,7 +121,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#4299E1"),
                     dotColor = Color.parseColor("#90CDF4"),
                     todayDotColor = Color.parseColor("#4299E1"),
-                    dateBackgroundColor = Color.parseColor("#D6F0FF")
+                    dateBackgroundColor = Color.parseColor("#D6F0FF"),
+                    settingsFontColor = Color.parseColor("#2C5282")
                 )
                 // Dark Themes - Mood Based
                 AppSettings.THEME_NORD -> ThemeColors( // Cool, Professional
@@ -128,7 +136,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#5E81AC"),
                     dotColor = Color.parseColor("#4C566A"),
                     todayDotColor = Color.parseColor("#5E81AC"),
-                    dateBackgroundColor = Color.parseColor("#2E3440")
+                    dateBackgroundColor = Color.parseColor("#2E3440"),
+                    settingsFontColor = Color.parseColor("#ECEFF4")
                 )
                 AppSettings.THEME_GRUVBOX -> ThemeColors( // Retro, Comfortable
                     backgroundColor = Color.parseColor("#282828"),
@@ -141,7 +150,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FB4934"),
                     dotColor = Color.parseColor("#665C54"),
                     todayDotColor = Color.parseColor("#FB4934"),
-                    dateBackgroundColor = Color.parseColor("#32302F")
+                    dateBackgroundColor = Color.parseColor("#32302F"),
+                    settingsFontColor = Color.parseColor("#EBDBB2")
                 )
                 AppSettings.THEME_SOLARIZED_DARK -> ThemeColors( // Balanced, Scientific
                     backgroundColor = Color.parseColor("#002B36"),
@@ -154,7 +164,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#DC322F"),
                     dotColor = Color.parseColor("#586E75"),
                     todayDotColor = Color.parseColor("#DC322F"),
-                    dateBackgroundColor = Color.parseColor("#073642")
+                    dateBackgroundColor = Color.parseColor("#073642"),
+                    settingsFontColor = Color.parseColor("#839496")
                 )
                 AppSettings.THEME_ONE_DARK -> ThemeColors( // Modern, Sleek
                     backgroundColor = Color.parseColor("#282C34"),
@@ -167,7 +178,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#E06C75"),
                     dotColor = Color.parseColor("#3E4451"),
                     todayDotColor = Color.parseColor("#E06C75"),
-                    dateBackgroundColor = Color.parseColor("#21252B")
+                    dateBackgroundColor = Color.parseColor("#21252B"),
+                    settingsFontColor = Color.parseColor("#ABB2BF")
                 )
                 AppSettings.THEME_DRACULA -> ThemeColors( // Vibrant, Mysterious
                     backgroundColor = Color.parseColor("#282A36"),
@@ -180,7 +192,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FF79C6"),
                     dotColor = Color.parseColor("#44475A"),
                     todayDotColor = Color.parseColor("#FF79C6"),
-                    dateBackgroundColor = Color.parseColor("#383A59")
+                    dateBackgroundColor = Color.parseColor("#383A59"),
+                    settingsFontColor = Color.parseColor("#F8F8F2")
                 )
                 AppSettings.THEME_AMOLED -> ThemeColors( // Pure Black, Battery Saving
                     backgroundColor = Color.parseColor("#000000"),
@@ -193,7 +206,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FF6B6B"),
                     dotColor = Color.parseColor("#333333"),
                     todayDotColor = Color.parseColor("#FF6B6B"),
-                    dateBackgroundColor = Color.parseColor("#0D0D0D")
+                    dateBackgroundColor = Color.parseColor("#0D0D0D"),
+                    settingsFontColor = Color.parseColor("#FFFFFF")
                 )
                 AppSettings.THEME_ROSE_GOLD -> ThemeColors( // Elegant, Luxurious
                     backgroundColor = Color.parseColor("#FFF5F7"),
@@ -206,7 +220,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#E8B4B8"),
                     dotColor = Color.parseColor("#F4C7C9"),
                     todayDotColor = Color.parseColor("#E8B4B8"),
-                    dateBackgroundColor = Color.parseColor("#FEF0F2")
+                    dateBackgroundColor = Color.parseColor("#FEF0F2"),
+                    settingsFontColor = Color.parseColor("#5D4037")
                 )
                 AppSettings.THEME_CHERRY_BLOSSOM -> ThemeColors( // Delicate, Spring-like
                     backgroundColor = Color.parseColor("#FFF0F5"),
@@ -219,7 +234,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FFB7D5"),
                     dotColor = Color.parseColor("#FFC9E1"),
                     todayDotColor = Color.parseColor("#FFB7D5"),
-                    dateBackgroundColor = Color.parseColor("#FFF5FA")
+                    dateBackgroundColor = Color.parseColor("#FFF5FA"),
+                    settingsFontColor = Color.parseColor("#4A1942")
                 )
                 AppSettings.THEME_OCEAN_BREEZE -> ThemeColors( // Calm, Serene
                     backgroundColor = Color.parseColor("#E8F4F8"),
@@ -232,7 +248,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#00BCD4"),
                     dotColor = Color.parseColor("#80DEEA"),
                     todayDotColor = Color.parseColor("#00BCD4"),
-                    dateBackgroundColor = Color.parseColor("#D8EDF2")
+                    dateBackgroundColor = Color.parseColor("#D8EDF2"),
+                    settingsFontColor = Color.parseColor("#004D61")
                 )
                 AppSettings.THEME_SUNSET -> ThemeColors( // Warm, Romantic
                     backgroundColor = Color.parseColor("#FFF4E6"),
@@ -245,7 +262,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FF8A65"),
                     dotColor = Color.parseColor("#FFAB91"),
                     todayDotColor = Color.parseColor("#FF8A65"),
-                    dateBackgroundColor = Color.parseColor("#FFF0E0")
+                    dateBackgroundColor = Color.parseColor("#FFF0E0"),
+                    settingsFontColor = Color.parseColor("#5D2E0D")
                 )
                 AppSettings.THEME_FOREST -> ThemeColors( // Natural, Grounded
                     backgroundColor = Color.parseColor("#F1F8F4"),
@@ -258,7 +276,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#66BB6A"),
                     dotColor = Color.parseColor("#81C784"),
                     todayDotColor = Color.parseColor("#66BB6A"),
-                    dateBackgroundColor = Color.parseColor("#E5F5E9")
+                    dateBackgroundColor = Color.parseColor("#E5F5E9"),
+                    settingsFontColor = Color.parseColor("#1B5E20")
                 )
                 AppSettings.THEME_MIDNIGHT_PURPLE -> ThemeColors( // Mystical, Elegant
                     backgroundColor = Color.parseColor("#1A0F2E"),
@@ -271,7 +290,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#BB86FC"),
                     dotColor = Color.parseColor("#5A3F7E"),
                     todayDotColor = Color.parseColor("#BB86FC"),
-                    dateBackgroundColor = Color.parseColor("#251540")
+                    dateBackgroundColor = Color.parseColor("#251540"),
+                    settingsFontColor = Color.parseColor("#E8DFF5")
                 )
                 AppSettings.THEME_CUSTOM -> {
                     if (context != null) {
@@ -287,7 +307,8 @@ data class ThemeColors(
                             buttonColor = settings.customButtonColor,
                             dotColor = settings.customDotColor,
                             todayDotColor = settings.customTodayDotColor,
-                            dateBackgroundColor = settings.customDateBackgroundColor
+                            dateBackgroundColor = settings.customDateBackgroundColor,
+                            settingsFontColor = settings.customTextColor
                         )
                     } else {
                         // Fallback to light theme if context not available
@@ -305,7 +326,8 @@ data class ThemeColors(
                     buttonColor = Color.parseColor("#FF6B6B"),
                     dotColor = Color.parseColor("#BDBDBD"),
                     todayDotColor = Color.parseColor("#FF6B6B"),
-                    dateBackgroundColor = Color.parseColor("#F0F0F0")
+                    dateBackgroundColor = Color.parseColor("#F0F0F0"),
+                    settingsFontColor = Color.parseColor("#1A1A1A")
                 )
             }
             
@@ -332,7 +354,8 @@ data class ThemeColors(
                 buttonColor = settings.getThemeCustomColor(themeName, "button") ?: base.buttonColor,
                 dotColor = settings.getThemeCustomColor(themeName, "dot") ?: base.dotColor,
                 todayDotColor = settings.getThemeCustomColor(themeName, "todayDot") ?: base.todayDotColor,
-                dateBackgroundColor = settings.getThemeCustomColor(themeName, "dateBg") ?: base.dateBackgroundColor
+                dateBackgroundColor = settings.getThemeCustomColor(themeName, "dateBg") ?: base.dateBackgroundColor,
+                settingsFontColor = settings.getThemeCustomColor(themeName, "settingsFont") ?: base.settingsFontColor
             )
         }
         

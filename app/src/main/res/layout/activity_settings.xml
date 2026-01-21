@@ -468,6 +468,54 @@
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/reminderOff"
+                        android:layout_width="56dp"
+                        android:layout_height="36dp"
+                        android:text="OFF"
+                        android:textSize="12sp"
+                        android:textColor="@android:color/white"
+                        android:gravity="center"
+                        android:background="@drawable/toggle_button" />
+
+                    <TextView
+                        android:id="@+id/reminderOn"
+                        android:layout_width="56dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="4dp"
+                        android:text="ON"
+                        android:textSize="12sp"
+                        android:textColor="@android:color/white"
+                        android:gravity="center"
+                        android:background="@drawable/toggle_button_selected" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- REMINDER TIME -->
+            <LinearLayout
+                android:id="@+id/reminderTimeRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp"
+                android:paddingStart="32dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Time"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_gray"
+                    android:fontFamily="sans-serif-condensed" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
@@ -531,6 +579,7 @@
                 android:focusable="true">
 
                 <TextView
+                    android:id="@+id/backupRestoreLabel"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -562,6 +611,7 @@
                 android:focusable="true">
 
                 <TextView
+                    android:id="@+id/exportLabel"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -606,8 +656,7 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <TextView                        android:id="@+id/storageLocationLabel"                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="⊡ STORAGE LOCATION"
@@ -653,8 +702,7 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <TextView                        android:id="@+id/wallpaperLabel"                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="⊡ WALLPAPER"
@@ -699,6 +747,7 @@
                     android:gravity="center_vertical">
 
                     <TextView
+                        android:id="@+id/databaseLabel"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
@@ -740,6 +789,7 @@
                 android:background="@drawable/rounded_card_background">
 
                 <TextView
+                    android:id="@+id/databaseInfoTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="⊡ Database Information"
@@ -749,6 +799,7 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/databaseType"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -758,6 +809,7 @@
                     android:fontFamily="sans-serif-condensed" />
 
                 <TextView
+                    android:id="@+id/databaseDescription"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="All journal entries are stored locally on your device. No data is synced to the cloud."
@@ -784,6 +836,7 @@
                 android:background="@drawable/rounded_card_background">
 
                 <TextView
+                    android:id="@+id/aboutTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ⓘ About"
@@ -793,6 +846,7 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/authorLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
@@ -802,6 +856,7 @@
                     android:fontFamily="sans-serif-condensed" />
 
                 <TextView
+                    android:id="@+id/authorName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Chakradhar Reddy Pakala"
@@ -848,6 +903,7 @@
                     android:alpha="0.3" />
 
                 <TextView
+                    android:id="@+id/feedbackTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="✉ Feedback &amp; Feature Requests"
@@ -857,6 +913,7 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/feedbackSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
@@ -875,6 +932,7 @@
                     android:fontFamily="sans-serif-condensed" />
 
                 <TextView
+                    android:id="@+id/feedbackMessage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"

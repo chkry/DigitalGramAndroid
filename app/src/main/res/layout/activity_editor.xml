@@ -304,7 +304,8 @@
                 android:id="@+id/previewScroll"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:visibility="gone">
+                android:visibility="gone"
+                android:scrollbars="vertical">
                 
                 <TextView
                     android:id="@+id/previewText"
@@ -314,7 +315,10 @@
                     android:textColor="@color/text_dark"
                     android:textSize="16sp"
                     android:linksClickable="true"
-                    android:autoLink="web" />
+                    android:autoLink="none"
+                    android:lineSpacingMultiplier="1.2"
+                    android:textIsSelectable="false"
+                    android:layerType="software" />
             </ScrollView>
 
         </FrameLayout>

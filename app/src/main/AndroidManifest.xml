@@ -11,7 +11,10 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -33,6 +36,7 @@
         
         <activity
             android:name=".EditorActivity"
+            android:exported="false"
             android:label="@string/edit_entry"
             android:parentActivityName=".MainActivity"
             android:theme="@style/Theme.DigitalGram"
@@ -40,18 +44,21 @@
         
         <activity
             android:name=".SettingsActivity"
+            android:exported="false"
             android:label="@string/settings"
             android:parentActivityName=".MainActivity"
             android:theme="@style/Theme.DigitalGram" />
         
         <activity
             android:name=".CustomThemeActivity"
+            android:exported="false"
             android:label="Custom Theme"
             android:parentActivityName=".SettingsActivity"
             android:theme="@style/Theme.DigitalGram" />
         
         <activity
             android:name=".ThemeEditorActivity"
+            android:exported="false"
             android:label="Edit Theme"
             android:parentActivityName=".SettingsActivity"
             android:theme="@style/Theme.DigitalGram" />
@@ -61,6 +68,12 @@
             android:label=""
             android:theme="@style/Theme.DigitalGram"
             android:exported="false" />
+        
+        <!-- UCrop Activity -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:theme="@style/UCropTheme" />
         
         <!-- Reminder Receiver -->
         <receiver

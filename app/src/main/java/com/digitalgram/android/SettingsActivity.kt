@@ -52,6 +52,12 @@ class SettingsActivity : AppCompatActivity() {
     private val fontSizeViews = mutableListOf<TextView>()
     private val borderViews = mutableListOf<TextView>()
     
+    // Dynamic button drawables for theme colors
+    private lateinit var selectedButtonDrawable: android.graphics.drawable.GradientDrawable
+    private lateinit var unselectedButtonDrawable: android.graphics.drawable.GradientDrawable
+    private lateinit var selectedToggleButtonDrawable: android.graphics.drawable.GradientDrawable
+    private lateinit var unselectedToggleButtonDrawable: android.graphics.drawable.GradientDrawable
+    
     private var passcodeCallback: (() -> Unit)? = null
     
     // Passcode activity launcher
@@ -96,7 +102,19 @@ class SettingsActivity : AppCompatActivity() {
     private val wallpaperPicker = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { handleWallpaperSelected(it) }
+        uri?.let { launchCropActivity(it) }
+    }
+    
+    // UCrop result launcher
+    private val cropLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.let { data ->
+                val resultUri = com.yalantis.ucrop.UCrop.getOutput(data)
+                resultUri?.let { handleWallpaperSelected(it) }
+            }
+        }
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -142,8 +160,26 @@ class SettingsActivity : AppCompatActivity() {
         binding.root.setBackgroundColor(themeColors.backgroundColor)
         
         // Apply text colors to values
-        binding.themeValue.setTextColor(themeColors.textColor)
-        binding.databaseValue.setTextColor(themeColors.textColor)
+        binding.themeValue.setTextColor(themeColors.settingsFontColor)
+        binding.databaseValue.setTextColor(themeColors.settingsFontColor)
+        
+        // Apply settings font color to all labels
+        applySettingsLabelColors(themeColors.settingsFontColor)
+        
+        // Apply colors to About and Database Info sections
+        applyAboutAndDatabaseColors(themeColors)
+        
+        // Apply button colors
+        applyButtonColors(themeColors.accentColor, themeColors.secondaryTextColor)
+        
+        // Refresh UI with new button colors
+        updateFontSizeUI()
+        updateBorderUI()
+        updateSystemFontUI()
+        updateFullscreenUI()
+        updatePasscodeUI()
+        updateFingerprintUI()
+        updateReminderUI()
         
         // Apply toolbar color
         binding.toolbar.setBackgroundColor(themeColors.backgroundColor)
@@ -156,6 +192,81 @@ class SettingsActivity : AppCompatActivity() {
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.isAppearanceLightStatusBars = !isDark
         insetsController.isAppearanceLightNavigationBars = !isDark
+    }
+    
+    private fun applyButtonColors(accentColor: Int, unselectedColor: Int) {
+        // Create drawable for selected state (accent color)
+        val selectedDrawable = android.graphics.drawable.GradientDrawable()
+        selectedDrawable.shape = android.graphics.drawable.GradientDrawable.OVAL
+        selectedDrawable.setColor(accentColor)
+        
+        // Create drawable for unselected state (muted color)
+        val unselectedDrawable = android.graphics.drawable.GradientDrawable()
+        unselectedDrawable.shape = android.graphics.drawable.GradientDrawable.OVAL
+        unselectedDrawable.setColor(unselectedColor)
+        
+        // Store drawables for later use
+        selectedButtonDrawable = selectedDrawable
+        unselectedButtonDrawable = unselectedDrawable
+        
+        // Apply to toggle buttons
+        val selectedToggleDrawable = android.graphics.drawable.GradientDrawable()
+        selectedToggleDrawable.cornerRadius = 20f
+        selectedToggleDrawable.setColor(accentColor)
+        
+        val unselectedToggleDrawable = android.graphics.drawable.GradientDrawable()
+        unselectedToggleDrawable.cornerRadius = 20f
+        unselectedToggleDrawable.setColor(unselectedColor)
+        
+        selectedToggleButtonDrawable = selectedToggleDrawable
+        unselectedToggleButtonDrawable = unselectedToggleDrawable
+    }
+    
+    private fun applySettingsLabelColors(color: Int) {
+        // Apply color to all label TextViews in settings
+        val views = ArrayList<View>()
+        binding.root.findViewsWithText(views, "▌", View.FIND_VIEWS_WITH_TEXT)
+        views.forEach { view ->
+            (view as? TextView)?.setTextColor(color)
+        }
+        
+        // Specific labels that need themed colors
+        binding.fullscreenLabel.setTextColor(color)
+        binding.fingerprintLabel.setTextColor(color)
+        binding.backupRestoreLabel.setTextColor(color)
+        binding.exportLabel.setTextColor(color)
+        binding.storageLocationLabel.setTextColor(color)
+        binding.wallpaperLabel.setTextColor(color)
+        binding.databaseLabel.setTextColor(color)
+        
+        // Value text views
+        binding.databaseValue.setTextColor(color)
+        binding.storageLocationValue.setTextColor(color)
+        binding.wallpaperValue.setTextColor(color)
+        binding.databaseCount.setTextColor(color)
+    }
+    
+    private fun applyAboutAndDatabaseColors(themeColors: com.digitalgram.android.util.ThemeColors) {
+        // Database Info section
+        binding.databaseInfoTitle.setTextColor(themeColors.textColor)
+        binding.databaseType.setTextColor(themeColors.secondaryTextColor)
+        binding.databaseDescription.setTextColor(themeColors.secondaryTextColor)
+        
+        // About section
+        binding.aboutTitle.setTextColor(themeColors.textColor)
+        binding.authorLabel.setTextColor(themeColors.secondaryTextColor)
+        binding.authorName.setTextColor(themeColors.textColor)
+        
+        // Links - use link color
+        binding.linkGithub.setTextColor(themeColors.linkColor)
+        binding.linkLinkedin.setTextColor(themeColors.linkColor)
+        binding.linkWebsite.setTextColor(themeColors.linkColor)
+        binding.linkEmail.setTextColor(themeColors.linkColor)
+        
+        // Feedback section
+        binding.feedbackTitle.setTextColor(themeColors.textColor)
+        binding.feedbackSubtitle.setTextColor(themeColors.secondaryTextColor)
+        binding.feedbackMessage.setTextColor(themeColors.secondaryTextColor)
     }
     
     private fun setupAboutLinks() {
@@ -197,9 +308,45 @@ class SettingsActivity : AppCompatActivity() {
         val fontNames = fonts.map { it.second }.toTypedArray()
         val currentIndex = fonts.indexOfFirst { it.first == settings.fontFamily }.takeIf { it >= 0 } ?: 0
         
+        // Create custom adapter to show fonts in their own typeface
+        val adapter = object : android.widget.ArrayAdapter<String>(
+            this,
+            android.R.layout.select_dialog_singlechoice,
+            fontNames
+        ) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val view = super.getView(position, convertView, parent)
+                val textView = view.findViewById<android.widget.CheckedTextView>(android.R.id.text1)
+                
+                // Apply the font typeface to the text
+                val fontFamily = fonts[position].first
+                val typeface = try {
+                    when (fontFamily) {
+                        AppSettings.FONT_BOOKERLY, AppSettings.FONT_SERIF -> android.graphics.Typeface.SERIF
+                        AppSettings.FONT_SANS -> android.graphics.Typeface.SANS_SERIF
+                        AppSettings.FONT_MONO -> android.graphics.Typeface.MONOSPACE
+                        AppSettings.FONT_CURSIVE -> android.graphics.Typeface.create("cursive", android.graphics.Typeface.NORMAL)
+                        AppSettings.FONT_CASUAL -> android.graphics.Typeface.create("casual", android.graphics.Typeface.NORMAL)
+                        AppSettings.FONT_SERIF_BOLD -> android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD)
+                        AppSettings.FONT_SERIF_ITALIC -> android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.ITALIC)
+                        AppSettings.FONT_SANS_BOLD -> android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+                        AppSettings.FONT_MONO_BOLD -> android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                        AppSettings.FONT_CURSIVE_BOLD -> android.graphics.Typeface.create("cursive", android.graphics.Typeface.BOLD)
+                        else -> android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL)
+                    } ?: android.graphics.Typeface.DEFAULT
+                } catch (e: Exception) {
+                    android.graphics.Typeface.DEFAULT
+                }
+                textView.typeface = typeface
+                textView.textSize = 18f
+                
+                return view
+            }
+        }
+        
         AlertDialog.Builder(this)
             .setTitle("Font Family")
-            .setSingleChoiceItems(fontNames, currentIndex) { dialog, which ->
+            .setSingleChoiceItems(adapter, currentIndex) { dialog, which ->
                 val selectedFont = fonts[which].first
                 settings.fontFamily = selectedFont
                 binding.fontFamilyValue.text = fonts[which].second
@@ -522,19 +669,89 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
     
+    private fun launchCropActivity(sourceUri: Uri) {
+        try {
+            // Get screen dimensions for crop ratio
+            val displayMetrics = resources.displayMetrics
+            val screenWidth = displayMetrics.widthPixels
+            val screenHeight = displayMetrics.heightPixels
+            
+            // Calculate aspect ratio
+            val aspectRatioX = screenWidth.toFloat()
+            val aspectRatioY = screenHeight.toFloat()
+            
+            // Create destination file for cropped image
+            val destinationFileName = "wallpaper_${System.currentTimeMillis()}.jpg"
+            val destinationUri = Uri.fromFile(File(cacheDir, destinationFileName))
+            
+            // Launch UCrop with screen aspect ratio
+            val uCrop = com.yalantis.ucrop.UCrop.of(sourceUri, destinationUri)
+                .withAspectRatio(aspectRatioX, aspectRatioY)
+                .withMaxResultSize(screenWidth, screenHeight)
+            
+            // Apply theme colors to UCrop
+            val themeColors = com.digitalgram.android.util.ThemeColors.getTheme(settings.theme, this)
+            val options = com.yalantis.ucrop.UCrop.Options()
+            options.setToolbarColor(themeColors.backgroundColor)
+            options.setStatusBarColor(themeColors.backgroundColor)
+            options.setActiveControlsWidgetColor(themeColors.accentColor)
+            options.setToolbarWidgetColor(themeColors.textColor)
+            options.setRootViewBackgroundColor(themeColors.backgroundColor)
+            options.setLogoColor(themeColors.accentColor)
+            options.setShowCropFrame(true)
+            options.setShowCropGrid(true)
+            options.setCropGridStrokeWidth(2)
+            options.setCropGridColor(themeColors.accentColor)
+            options.setToolbarTitle("Crop Wallpaper")
+            
+            // Add padding to avoid status bar overlap
+            options.setFreeStyleCropEnabled(false)
+            options.setHideBottomControls(false)
+            options.setCompressionQuality(95)
+            
+            uCrop.withOptions(options)
+            
+            cropLauncher.launch(uCrop.getIntent(this))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "Failed to open crop editor: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+    
     private fun handleWallpaperSelected(uri: Uri) {
         try {
-            // Take persistent permission
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-            
-            // Save the URI
-            settings.wallpaperUri = uri.toString()
-            updateWallpaperUI()
-            Toast.makeText(this, "Wallpaper set successfully", Toast.LENGTH_SHORT).show()
-            setResult(RESULT_OK)
+            // For cropped images from cache, copy to persistent location
+            if (uri.path?.startsWith(cacheDir.absolutePath) == true) {
+                // Copy cropped image to app's private storage
+                val inputStream = contentResolver.openInputStream(uri)
+                val fileName = "wallpaper_${System.currentTimeMillis()}.jpg"
+                val outputFile = File(filesDir, fileName)
+                
+                inputStream?.use { input ->
+                    outputFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                
+                // Save the file URI
+                val fileUri = Uri.fromFile(outputFile)
+                settings.wallpaperUri = fileUri.toString()
+                updateWallpaperUI()
+                Toast.makeText(this, "Wallpaper set successfully", Toast.LENGTH_SHORT).show()
+                setResult(RESULT_OK)
+            } else {
+                // For other URIs, take persistent permission
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                
+                // Save the URI
+                settings.wallpaperUri = uri.toString()
+                updateWallpaperUI()
+                Toast.makeText(this, "Wallpaper set successfully", Toast.LENGTH_SHORT).show()
+                setResult(RESULT_OK)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(this, "Failed to set wallpaper: ${e.message}", Toast.LENGTH_LONG).show()
@@ -586,6 +803,7 @@ class SettingsActivity : AppCompatActivity() {
     
     private fun showDatabaseOptionsDialog() {
         val options = arrayOf(
+            "Rename Database",
             "Import Database",
             "Import & Merge Database",
             "Delete Current Database",
@@ -596,14 +814,67 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle("Database Options")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> launchImportDatabasePicker(merge = false)
-                    1 -> launchImportDatabasePicker(merge = true)
-                    2 -> confirmDeleteCurrentDatabase()
-                    3 -> exportCurrentDatabase()
+                    0 -> showRenameDatabaseDialog()
+                    1 -> launchImportDatabasePicker(merge = false)
+                    2 -> launchImportDatabasePicker(merge = true)
+                    3 -> confirmDeleteCurrentDatabase()
+                    4 -> exportCurrentDatabase()
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+    
+    private fun showRenameDatabaseDialog() {
+        val database = JournalDatabase.getInstance(applicationContext)
+        val currentName = database.getCurrentDatabaseName()
+        val nameWithoutExt = currentName.removeSuffix(".sqlite").removeSuffix(".db")
+        
+        val editText = android.widget.EditText(this)
+        editText.setText(nameWithoutExt)
+        editText.selectAll()
+        editText.setHint("Database name")
+        
+        val container = android.widget.FrameLayout(this)
+        val params = android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        params.leftMargin = resources.getDimensionPixelSize(android.R.dimen.app_icon_size) / 2
+        params.rightMargin = resources.getDimensionPixelSize(android.R.dimen.app_icon_size) / 2
+        editText.layoutParams = params
+        container.addView(editText)
+        
+        AlertDialog.Builder(this)
+            .setTitle("Rename Database")
+            .setMessage("Enter a new name for the database")
+            .setView(container)
+            .setPositiveButton("Rename") { _, _ ->
+                val newName = editText.text.toString().trim()
+                if (newName.isEmpty()) {
+                    Toast.makeText(this, "Database name cannot be empty", Toast.LENGTH_SHORT).show()
+                } else if (newName.contains("/") || newName.contains("\\")) {
+                    Toast.makeText(this, "Database name cannot contain slashes", Toast.LENGTH_SHORT).show()
+                } else {
+                    val renamed = database.renameDatabase(newName)
+                    if (renamed) {
+                        Toast.makeText(this, "Database renamed successfully", Toast.LENGTH_SHORT).show()
+                        binding.databaseValue.text = database.getCurrentDatabaseName()
+                        setResult(RESULT_OK)
+                    } else {
+                        Toast.makeText(this, "Failed to rename database. Name may already exist.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+        
+        // Show keyboard
+        editText.postDelayed({
+            editText.requestFocus()
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }, 100)
     }
     
     private var pendingMerge = false
@@ -901,14 +1172,6 @@ class SettingsActivity : AppCompatActivity() {
             binding.fingerprintLabel.setTextColor(ContextCompat.getColor(this, R.color.text_hint))
             binding.fingerprintOff.isClickable = false
             binding.fingerprintOn.isClickable = false
-            
-            val errorMessage = when (canAuthenticate) {
-                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "No biometric hardware"
-                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "Hardware unavailable"
-                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "No fingerprint enrolled"
-                else -> "Biometric unavailable"
-            }
-            Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
             return
         }
         
@@ -964,6 +1227,20 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun setupReminder() {
+        // ON/OFF toggle
+        binding.reminderOff.setOnClickListener {
+            settings.reminderEnabled = false
+            updateReminderUI()
+            cancelReminder()
+        }
+        
+        binding.reminderOn.setOnClickListener {
+            settings.reminderEnabled = true
+            updateReminderUI()
+            scheduleReminder()
+        }
+        
+        // Time adjustment buttons
         binding.reminderHourDown.setOnClickListener {
             val newTime = settings.reminderTimeMinutes - 60
             settings.reminderTimeMinutes = if (newTime < 0) 23 * 60 + (newTime + 60) % 60 else newTime
@@ -1020,12 +1297,10 @@ class SettingsActivity : AppCompatActivity() {
     
     private fun updateFontSizeUI() {
         fontSizeViews.forEachIndexed { index, view ->
-            view.setBackgroundResource(
-                if (index + 1 == settings.fontSize) 
-                    R.drawable.circle_button_selected 
-                else 
-                    R.drawable.circle_button
-            )
+            view.background = if (index + 1 == settings.fontSize) 
+                selectedButtonDrawable.constantState?.newDrawable()?.mutate()
+            else 
+                unselectedButtonDrawable.constantState?.newDrawable()?.mutate()
         }
     }
     
@@ -1038,40 +1313,47 @@ class SettingsActivity : AppCompatActivity() {
         )
         
         borderViews.forEachIndexed { index, view ->
-            view.setBackgroundResource(
-                if (borderStyles[index] == settings.borderStyle) 
-                    R.drawable.circle_button_selected 
-                else 
-                    R.drawable.circle_button
-            )
+            view.background = if (borderStyles[index] == settings.borderStyle) 
+                selectedButtonDrawable.constantState?.newDrawable()?.mutate()
+            else 
+                unselectedButtonDrawable.constantState?.newDrawable()?.mutate()
         }
     }
     
     private fun updateSystemFontUI() {
-        binding.systemFontOff.setBackgroundResource(
-            if (!settings.useSystemFont) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
-        binding.systemFontOn.setBackgroundResource(
-            if (settings.useSystemFont) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
+        binding.systemFontOff.background = if (!settings.useSystemFont)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+            
+        binding.systemFontOn.background = if (settings.useSystemFont)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
     }
 
     private fun updateFullscreenUI() {
-        binding.fullscreenOff.setBackgroundResource(
-            if (!settings.fullscreen) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
-        binding.fullscreenOn.setBackgroundResource(
-            if (settings.fullscreen) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
+        binding.fullscreenOff.background = if (!settings.fullscreen)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+            
+        binding.fullscreenOn.background = if (settings.fullscreen)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
     }
     
     private fun updatePasscodeUI() {
-        binding.passcodeOff.setBackgroundResource(
-            if (!settings.passcodeEnabled) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
-        binding.passcodeOn.setBackgroundResource(
-            if (settings.passcodeEnabled) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
+        binding.passcodeOff.background = if (!settings.passcodeEnabled)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+            
+        binding.passcodeOn.background = if (settings.passcodeEnabled)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
         
         // Show/hide change passcode button
         binding.changePasscode.visibility = if (settings.passcodeEnabled) View.VISIBLE else View.INVISIBLE
@@ -1084,12 +1366,15 @@ class SettingsActivity : AppCompatActivity() {
             ContextCompat.getColor(this, if (enabled) R.color.text_dark else R.color.text_hint)
         )
         
-        binding.fingerprintOff.setBackgroundResource(
-            if (!settings.fingerprintEnabled) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
-        binding.fingerprintOn.setBackgroundResource(
-            if (settings.fingerprintEnabled) R.drawable.toggle_button_selected else R.drawable.toggle_button
-        )
+        binding.fingerprintOff.background = if (!settings.fingerprintEnabled)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+            
+        binding.fingerprintOn.background = if (settings.fingerprintEnabled)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
         
         // Disable clicks if passcode not enabled
         binding.fingerprintOff.isClickable = enabled
@@ -1098,6 +1383,25 @@ class SettingsActivity : AppCompatActivity() {
     
     private fun updateReminderUI() {
         binding.reminderTime.text = settings.getReminderTimeFormatted()
+        
+        // Update toggle buttons
+        binding.reminderOff.background = if (!settings.reminderEnabled)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+            
+        binding.reminderOn.background = if (settings.reminderEnabled)
+            selectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        else
+            unselectedToggleButtonDrawable.constantState?.newDrawable()?.mutate()
+        
+        // Enable/disable time controls based on reminder state
+        val enabled = settings.reminderEnabled
+        binding.reminderTimeRow.alpha = if (enabled) 1.0f else 0.5f
+        binding.reminderHourDown.isClickable = enabled
+        binding.reminderMinuteDown.isClickable = enabled
+        binding.reminderMinuteUp.isClickable = enabled
+        binding.reminderHourUp.isClickable = enabled
     }
     
     private fun applyFullscreenSetting() {
@@ -1282,6 +1586,16 @@ class SettingsActivity : AppCompatActivity() {
             AlarmManager.INTERVAL_DAY,
             pendingIntent
         )
+    }
+    
+    private fun cancelReminder() {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, ReminderReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
     }
     
     private fun createNotificationChannel() {

@@ -34,6 +34,7 @@ class JournalAdapter(
     private var currentMonth: Calendar = Calendar.getInstance()
     private var themeColors: ThemeColors = ThemeColors.getTheme(AppSettings.THEME_DEFAULT)
     private var fontSizeSp: Float = 16f
+    private var borderStyle: String = AppSettings.BORDER_A
     
     fun submitList(journalEntries: List<JournalEntry>) {
         entries = journalEntries
@@ -55,6 +56,21 @@ class JournalAdapter(
     fun setFontSize(sizeSp: Float) {
         fontSizeSp = sizeSp
         notifyDataSetChanged()
+    }
+    
+    fun setBorderStyle(style: String) {
+        borderStyle = style
+        notifyDataSetChanged()
+    }
+    
+    private fun getBorderWidth(borderStyle: String): Int {
+        return when (borderStyle) {
+            AppSettings.BORDER_A -> 0  // No border
+            AppSettings.BORDER_B -> 1  // Thin border
+            AppSettings.BORDER_C -> 2  // Medium border
+            AppSettings.BORDER_E -> 4  // Thick border
+            else -> 2 // Default medium border
+        }
     }
     
     fun getTodayPosition(): Int {
@@ -213,7 +229,8 @@ class JournalAdapter(
                 entry.content,
                 themeColors.linkColor,
                 themeColors.codeBackgroundColor,
-                themeColors.textColor
+                themeColors.textColor,
+                themeColors.accentColor
             )
             binding.entryContent.text = previewText
             
@@ -226,7 +243,7 @@ class JournalAdapter(
             binding.dayNumber.setTextColor(themeColors.textColor)
             binding.entryCard.setCardBackgroundColor(themeColors.backgroundColor)
             binding.entryCard.strokeColor = themeColors.borderColor
-            binding.entryCard.strokeWidth = 2
+            binding.entryCard.strokeWidth = getBorderWidth(borderStyle)
             
             // Apply date background color to date box
             val dateBoxDrawable = binding.dateBox.background

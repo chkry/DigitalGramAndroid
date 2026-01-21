@@ -89,6 +89,54 @@ class JournalDatabase private constructor(
     }
     
     /**
+     * Rename the current database
+     */
+    fun renameDatabase(newName: String): Boolean {
+        val newDbName = if (newName.endsWith(".sqlite") || newName.endsWith(".db")) newName else "$newName.sqlite"
+        
+        // Check if a database with the new name already exists
+        val newDbFile = context.getDatabasePath(newDbName)
+        if (newDbFile.exists()) {
+            return false // Database with new name already exists
+        }
+        
+        // Close current database connection
+        dbHelper?.close()
+        
+        // Get file references
+        val oldDbFile = context.getDatabasePath(databaseName)
+        val oldWalFile = File(oldDbFile.path + "-wal")
+        val oldShmFile = File(oldDbFile.path + "-shm")
+        val oldJournalFile = File(oldDbFile.path + "-journal")
+        
+        val newWalFile = File(newDbFile.path + "-wal")
+        val newShmFile = File(newDbFile.path + "-shm")
+        val newJournalFile = File(newDbFile.path + "-journal")
+        
+        // Rename main database file
+        val renamed = oldDbFile.renameTo(newDbFile)
+        if (!renamed) {
+            // Reopen old database
+            dbHelper = JournalDbHelper(context, databaseName)
+            return false
+        }
+        
+        // Rename associated files if they exist
+        if (oldWalFile.exists()) oldWalFile.renameTo(newWalFile)
+        if (oldShmFile.exists()) oldShmFile.renameTo(newShmFile)
+        if (oldJournalFile.exists()) oldJournalFile.renameTo(newJournalFile)
+        
+        // Update current database name and reopen
+        databaseName = newDbName
+        val settings = AppSettings.getInstance(context)
+        settings.currentDatabase = newDbName
+        dbHelper = JournalDbHelper(context, newDbName)
+        refreshEntriesAsync()
+        
+        return true
+    }
+    
+    /**
      * Delete a database (cannot delete current database)
      */
     fun deleteDatabase(name: String): Boolean {

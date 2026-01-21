@@ -1,20 +1,51 @@
 package com.digitalgram.android.util
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Typeface
+import android.net.Uri
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.*
+import android.view.View
+
+/**
+ * Custom URLSpan that normalizes URLs before opening
+ */
+class CustomURLSpan(private val url: String) : URLSpan(url) {
+    override fun onClick(widget: View) {
+        val context = widget.context
+        val normalizedUrl = normalizeUrl(url)
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(normalizedUrl))
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    private fun normalizeUrl(url: String): String {
+        var normalized = url.trim()
+        
+        // If URL doesn't have a protocol, add https://
+        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+            normalized = "https://$normalized"
+        }
+        
+        return normalized
+    }
+}
 
 /**
  * Markdown parser for rendering markdown text to styled SpannableString
  */
 object MarkdownParser {
     
-    fun parse(text: String, linkColor: Int, codeBackgroundColor: Int, textColor: Int): SpannableStringBuilder {
+    fun parse(text: String, linkColor: Int, codeBackgroundColor: Int, textColor: Int, accentColor: Int = linkColor): SpannableStringBuilder {
         val builder = SpannableStringBuilder(text)
         
         // Process block-level elements first
-        processCheckboxes(builder)
+        processCheckboxes(builder, accentColor)
         processBulletPoints(builder)
         processHeaders(builder)
         processBlockquotes(builder, textColor)
@@ -29,7 +60,7 @@ object MarkdownParser {
         return builder
     }
     
-    private fun processCheckboxes(builder: SpannableStringBuilder) {
+    private fun processCheckboxes(builder: SpannableStringBuilder, accentColor: Int) {
         // Process unchecked checkboxes: - [ ] item
         var text = builder.toString()
         val uncheckedPattern = Regex("^- \\[ ] ", RegexOption.MULTILINE)
@@ -41,6 +72,21 @@ object MarkdownParser {
             
             // Replace "- [ ] " with "☐ "
             builder.replace(start, end, "☐ ")
+            
+            // Apply larger size and accent color to checkbox
+            val checkboxEnd = start + 2 // "☐ " is 2 characters
+            builder.setSpan(
+                RelativeSizeSpan(1.4f), // Make checkbox 40% larger
+                start,
+                checkboxEnd - 1, // Just the checkbox character
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            builder.setSpan(
+                ForegroundColorSpan(accentColor),
+                start,
+                checkboxEnd - 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
             
             text = builder.toString()
             match = uncheckedPattern.find(text)
@@ -57,6 +103,21 @@ object MarkdownParser {
             
             // Replace "- [x] " with "☑ "
             builder.replace(start, end, "☑ ")
+            
+            // Apply larger size and accent color to checkbox
+            val checkboxEnd = start + 2 // "☑ " is 2 characters
+            builder.setSpan(
+                RelativeSizeSpan(1.4f), // Make checkbox 40% larger
+                start,
+                checkboxEnd - 1, // Just the checkbox character
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            builder.setSpan(
+                ForegroundColorSpan(accentColor),
+                start,
+                checkboxEnd - 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
             
             text = builder.toString()
             match = checkedPattern.find(text)
@@ -344,9 +405,9 @@ object MarkdownParser {
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
-            // Optional: Add clickable span with URL
+            // Add clickable span with normalized URL
             builder.setSpan(
-                android.text.style.URLSpan(urlGroup.value),
+                CustomURLSpan(urlGroup.value),
                 fullMatch.first,
                 fullMatch.first + textGroup.value.length,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE

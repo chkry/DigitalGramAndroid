@@ -83,6 +83,7 @@ class EditorActivity : AppCompatActivity() {
         setupWindowInsets()
         setupKeyboardDetection()
         setupEditTextScrolling()
+        setupEnterKeyHandler()
         loadEntry()
         setupDateDisplay()
         setupDoneButton()
@@ -152,7 +153,7 @@ class EditorActivity : AppCompatActivity() {
                 scrollRunnable = Runnable {
                     scrollToCursorPosition()
                 }
-                scrollHandler.postDelayed(scrollRunnable!!, 150)
+                scrollRunnable?.let { scrollHandler.postDelayed(it, 150) }
                 
             } else if (!keyboardVisible && isKeyboardVisible) {
                 currentKeyboardHeight = 0
@@ -189,7 +190,7 @@ class EditorActivity : AppCompatActivity() {
                 scrollRunnable = Runnable {
                     scrollToCursorPosition()
                 }
-                scrollHandler.postDelayed(scrollRunnable!!, 100)
+                scrollRunnable?.let { scrollHandler.postDelayed(it, 100) }
             }
         }
     }
@@ -225,6 +226,16 @@ class EditorActivity : AppCompatActivity() {
         return (this * resources.displayMetrics.density).toInt()
     }
     
+    private fun getBorderWidth(borderStyle: String): Int {
+        return when (borderStyle) {
+            AppSettings.BORDER_A -> 0  // No border
+            AppSettings.BORDER_B -> 1  // Thin border
+            AppSettings.BORDER_C -> 2  // Medium border
+            AppSettings.BORDER_E -> 4  // Thick border
+            else -> 2 // Default medium border
+        }
+    }
+    
     private fun hideKeyboard() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         currentFocus?.let {
@@ -254,6 +265,82 @@ class EditorActivity : AppCompatActivity() {
         }
     }
     
+    private fun setupEnterKeyHandler() {
+        binding.contentEditText.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_ENTER && 
+                event.action == android.view.KeyEvent.ACTION_DOWN) {
+                handleEnterKey()
+                return@setOnKeyListener true
+            }
+            false
+        }
+    }
+    
+    private fun handleEnterKey() {
+        val editText = binding.contentEditText
+        val cursorPosition = editText.selectionStart
+        val text = editText.text.toString()
+        
+        // Find the current line
+        val lineStart = text.lastIndexOf('\n', cursorPosition - 1) + 1
+        val lineEnd = text.indexOf('\n', cursorPosition).let { if (it == -1) text.length else it }
+        val currentLine = text.substring(lineStart, lineEnd)
+        
+        // Check for checkbox patterns
+        val checkboxUnchecked = Regex("^- \\[ ] (.*)$")
+        val checkboxChecked = Regex("^- \\[[xX]] (.*)$")
+        val bulletPoint = Regex("^- (.*)$")
+        val starBullet = Regex("^\\* (.*)$")
+        
+        val prefix = when {
+            checkboxUnchecked.matches(currentLine) -> {
+                val content = checkboxUnchecked.find(currentLine)?.groups?.get(1)?.value ?: ""
+                // If line is empty checkbox, remove it instead of creating new one
+                if (content.trim().isEmpty()) {
+                    // Remove the empty checkbox line
+                    editText.text.delete(lineStart, cursorPosition)
+                    return
+                }
+                "- [ ] "
+            }
+            checkboxChecked.matches(currentLine) -> {
+                val content = checkboxChecked.find(currentLine)?.groups?.get(1)?.value ?: ""
+                if (content.trim().isEmpty()) {
+                    editText.text.delete(lineStart, cursorPosition)
+                    return
+                }
+                "- [ ] "  // Start new line with unchecked checkbox
+            }
+            bulletPoint.matches(currentLine) -> {
+                val content = bulletPoint.find(currentLine)?.groups?.get(1)?.value ?: ""
+                if (content.trim().isEmpty()) {
+                    editText.text.delete(lineStart, cursorPosition)
+                    return
+                }
+                "- "
+            }
+            starBullet.matches(currentLine) -> {
+                val content = starBullet.find(currentLine)?.groups?.get(1)?.value ?: ""
+                if (content.trim().isEmpty()) {
+                    editText.text.delete(lineStart, cursorPosition)
+                    return
+                }
+                "* "
+            }
+            else -> null
+        }
+        
+        if (prefix != null) {
+            // Insert newline and prefix
+            editText.text.insert(cursorPosition, "\n$prefix")
+            editText.setSelection(cursorPosition + prefix.length + 1)
+        } else {
+            // Normal newline
+            editText.text.insert(cursorPosition, "\n")
+            editText.setSelection(cursorPosition + 1)
+        }
+    }
+    
     private fun scrollToCursor() {
         scrollToEditText()
     }
@@ -276,14 +363,14 @@ class EditorActivity : AppCompatActivity() {
                     scrollRunnable = Runnable {
                         scrollToCursorPosition()
                     }
-                    scrollHandler.postDelayed(scrollRunnable!!, 100)
+                    scrollRunnable?.let { scrollHandler.postDelayed(it, 100) }
                 }
                 
                 // Schedule a new save after 2 seconds of no typing
                 saveRunnable = Runnable {
                     autoSaveEntry()
                 }
-                handler.postDelayed(saveRunnable!!, 2000)
+                saveRunnable?.let { handler.postDelayed(it, 2000) }
                 
                 // Scroll to cursor after text changes when keyboard is visible
                 if (isKeyboardVisible) {
@@ -299,13 +386,11 @@ class EditorActivity : AppCompatActivity() {
         if (content.isEmpty()) return
         
         lifecycleScope.launch {
-            val entry = if (currentEntry != null) {
+            val entry = currentEntry?.let { current ->
                 with(JournalEntry.Companion) {
-                    currentEntry!!.withUpdatedContent(content)
+                    current.withUpdatedContent(content)
                 }
-            } else {
-                JournalEntry.create(selectedDate, content)
-            }
+            } ?: JournalEntry.create(selectedDate, content)
             
             database.saveEntry(entry)
             currentEntry = entry
@@ -366,10 +451,13 @@ class EditorActivity : AppCompatActivity() {
         }
         
         // Apply background to the content frame with border - always create new drawable
+        val borderWidth = getBorderWidth(settings.borderStyle)
         val contentFrameDrawable = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.RECTANGLE
             setColor(themeColors.backgroundColor)
-            setStroke(2.dpToPx(), themeColors.borderColor)
+            if (borderWidth > 0) {
+                setStroke(borderWidth.dpToPx(), themeColors.borderColor)
+            }
             cornerRadius = 0f
         }
         binding.contentFrame.background = contentFrameDrawable
@@ -412,7 +500,7 @@ class EditorActivity : AppCompatActivity() {
         binding.previewText.textSize = fontSizeSp
         
         // Apply font family
-        val fontFamily = android.graphics.Typeface.create(settings.fontFamily, android.graphics.Typeface.NORMAL)
+        val fontFamily = getTypefaceForFont(settings.fontFamily)
         binding.contentEditText.typeface = fontFamily
         binding.previewText.typeface = fontFamily
         
@@ -559,9 +647,12 @@ class EditorActivity : AppCompatActivity() {
             
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 if (isPreviewMode) {
-                    // Handle checkbox toggle on single tap
-                    handleCheckboxTap(e)
-                    return true
+                    // Check if tap is on a link first
+                    if (!isTapOnLink(e)) {
+                        // Handle checkbox toggle on single tap
+                        handleCheckboxTap(e)
+                        return true
+                    }
                 }
                 return false
             }
@@ -572,6 +663,26 @@ class EditorActivity : AppCompatActivity() {
             // Don't consume touch for links
             false
         }
+    }
+    
+    private fun isTapOnLink(event: MotionEvent): Boolean {
+        val textView = binding.previewText
+        val text = textView.text
+        
+        if (text !is android.text.Spanned) return false
+        
+        val layout = textView.layout ?: return false
+        val x = event.x.toInt() - textView.totalPaddingLeft
+        val y = event.y.toInt() - textView.totalPaddingTop
+        
+        if (x < 0 || y < 0) return false
+        
+        val line = layout.getLineForVertical(y)
+        val offset = layout.getOffsetForHorizontal(line, x.toFloat())
+        
+        // Check if there's a URLSpan at this position
+        val urlSpans = text.getSpans(offset, offset, android.text.style.URLSpan::class.java)
+        return urlSpans.isNotEmpty()
     }
     
     private fun handleCheckboxTap(event: MotionEvent) {
@@ -642,15 +753,33 @@ class EditorActivity : AppCompatActivity() {
             binding.markdownToolbar.visibility = View.GONE
             binding.previewToggle.text = "Edit"
             
-            // Parse and display markdown
+            // Parse and display markdown with compatibility fixes
             val content = binding.contentEditText.text.toString()
-            binding.previewText.text = MarkdownParser.parse(
-                content,
-                themeColors.linkColor,
-                themeColors.codeBackgroundColor,
-                themeColors.textColor
-            )
-            binding.previewText.movementMethod = LinkMovementMethod.getInstance()
+            try {
+                val styledText = MarkdownParser.parse(
+                    content,
+                    themeColors.linkColor,
+                    themeColors.codeBackgroundColor,
+                    themeColors.textColor,
+                    themeColors.accentColor
+                )
+                
+                // Set text first
+                binding.previewText.text = styledText
+                
+                // Force software rendering for better compatibility
+                binding.previewText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                
+                // Set movement method for clickable links
+                binding.previewText.movementMethod = LinkMovementMethod.getInstance()
+                
+                // Trigger redraw
+                binding.previewText.invalidate()
+            } catch (e: Exception) {
+                // Fallback to plain text if markdown parsing fails
+                binding.previewText.text = content
+                e.printStackTrace()
+            }
         } else {
             // Show editor
             binding.contentEditText.visibility = View.VISIBLE
@@ -760,15 +889,12 @@ class EditorActivity : AppCompatActivity() {
         }
         
         lifecycleScope.launch {
-            val entry = if (currentEntry != null) {
+            val entry = currentEntry?.let { current ->
                 // Update existing entry
                 with(JournalEntry.Companion) {
-                    currentEntry!!.withUpdatedContent(content)
+                    current.withUpdatedContent(content)
                 }
-            } else {
-                // Create new entry
-                JournalEntry.create(selectedDate, content)
-            }
+            } ?: JournalEntry.create(selectedDate, content)  // Create new entry
             
             database.saveEntry(entry)
             finish()
@@ -806,6 +932,17 @@ class EditorActivity : AppCompatActivity() {
         // Clean up the global layout listener
         globalLayoutListener?.let {
             binding.root.viewTreeObserver.removeOnGlobalLayoutListener(it)
+        }
+    }
+    
+    private fun getTypefaceForFont(fontFamily: String): android.graphics.Typeface {
+        return when (fontFamily) {
+            AppSettings.FONT_SERIF_BOLD -> android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD)
+            AppSettings.FONT_SERIF_ITALIC -> android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.ITALIC)
+            AppSettings.FONT_SANS_BOLD -> android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+            AppSettings.FONT_MONO_BOLD -> android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+            AppSettings.FONT_CURSIVE_BOLD -> android.graphics.Typeface.create("cursive", android.graphics.Typeface.BOLD)
+            else -> android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL)
         }
     }
 }

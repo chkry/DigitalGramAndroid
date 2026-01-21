@@ -339,13 +339,35 @@ class AppSettings private constructor(context: Context) {
         const val FONT_MONO = "monospace" // Typewriter
         const val FONT_CONDENSED = "sans-serif-condensed" // Compact
         const val FONT_BOOKERLY = "serif" // Bookerly style (serif)
+        const val FONT_CURSIVE = "cursive" // Handwriting/Script style
+        const val FONT_CASUAL = "casual" // Casual handwriting
+        const val FONT_LIGHT = "sans-serif-light" // Light elegant
+        const val FONT_THIN = "sans-serif-thin" // Ultra light
+        const val FONT_SMALLCAPS = "sans-serif-smallcaps" // Small caps
+        
+        // Stylish fonts using system typefaces
+        const val FONT_SERIF_BOLD = "serif-bold" // Bold serif
+        const val FONT_SERIF_ITALIC = "serif-italic" // Italic serif
+        const val FONT_SANS_BOLD = "sans-serif-bold" // Bold sans
+        const val FONT_MONO_BOLD = "monospace-bold" // Bold mono
+        const val FONT_CURSIVE_BOLD = "cursive-bold" // Bold cursive
         
         val ALL_FONTS = listOf(
             FONT_BOOKERLY to "Bookerly",
             FONT_SERIF to "Georgia",
             FONT_SANS to "Helvetica",
+            FONT_LIGHT to "Elegant Light",
+            FONT_THIN to "Ultra Thin",
             FONT_CONDENSED to "Compact",
-            FONT_MONO to "Courier"
+            FONT_SMALLCAPS to "Small Caps",
+            FONT_MONO to "Courier",
+            FONT_CURSIVE to "Cursive",
+            FONT_CASUAL to "Casual",
+            FONT_SERIF_BOLD to "Bold Serif",
+            FONT_SERIF_ITALIC to "Italic Serif",
+            FONT_SANS_BOLD to "Bold Sans",
+            FONT_MONO_BOLD to "Bold Mono",
+            FONT_CURSIVE_BOLD to "Fancy Cursive"
         )
         
         // Border styles

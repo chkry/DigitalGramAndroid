@@ -25,3 +25,42 @@
 
 # Keep ViewModel classes
 -keep class com.digitalgram.android.ui.** { *; }
+
+# JSR 305 annotations
+-dontwarn javax.annotation.**
+-dontwarn javax.annotation.concurrent.**
+
+# Tink crypto
+-dontwarn com.google.errorprone.annotations.**
+-keep class com.google.crypto.tink.** { *; }
+
+# Google API client (not used but referenced by Tink)
+-dontwarn com.google.api.client.**
+-dontwarn org.joda.time.**
+
+# Security: Remove logging in release builds
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+}
+
+# Security: Obfuscate security-related classes
+-keep class com.digitalgram.android.PasscodeActivity { *; }
+-keep class com.digitalgram.android.data.AppSettings {
+    public <methods>;
+}
+
+# Keep UCrop classes
+-keep class com.yalantis.ucrop.** { *; }
+-dontwarn com.yalantis.ucrop.**
+
+# Keep Biometric classes
+-keep class androidx.biometric.** { *; }
+
+# Security: Prevent reflection on sensitive methods
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
