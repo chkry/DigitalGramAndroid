@@ -529,7 +529,10 @@ class EditorActivity : AppCompatActivity() {
                     
                     // Start in preview mode if content exists
                     isPreviewMode = true
-                    updatePreviewMode()
+                    // Post to ensure view is laid out before updating preview
+                    binding.previewText.post {
+                        updatePreviewMode()
+                    }
                 }
             }
         } else {
@@ -548,7 +551,10 @@ class EditorActivity : AppCompatActivity() {
                     
                     // Start in preview mode if content exists
                     isPreviewMode = true
-                    updatePreviewMode()
+                    // Post to ensure view is laid out before updating preview
+                    binding.previewText.post {
+                        updatePreviewMode()
+                    }
                 }
             }
         }
@@ -592,7 +598,10 @@ class EditorActivity : AppCompatActivity() {
                 
                 // Switch to preview mode if content exists
                 isPreviewMode = true
-                updatePreviewMode()
+                // Post to ensure view is laid out before updating preview
+                binding.previewText.post {
+                    updatePreviewMode()
+                }
                 
                 Toast.makeText(this@EditorActivity, 
                     "Loaded existing entry", Toast.LENGTH_SHORT).show()
