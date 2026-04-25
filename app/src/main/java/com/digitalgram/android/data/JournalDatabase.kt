@@ -25,6 +25,9 @@ class JournalDatabase private constructor(
     private val _entriesLiveData = MutableLiveData<List<JournalEntry>>()
     val entries: LiveData<List<JournalEntry>> = _entriesLiveData
     private val scope = CoroutineScope(Dispatchers.IO)
+
+    @Volatile private var filterYear: Int? = null
+    @Volatile private var filterMonth: Int? = null
     
     init {
         openDatabase(databaseName)
@@ -39,6 +42,35 @@ class JournalDatabase private constructor(
     
     fun switchDatabase(name: String) {
         openDatabase(name)
+        // Persist immediately so a crash between switch and a later AppSettings.save()
+        // doesn't leave the next launch pointed at the wrong DB file.
+        AppSettings.getInstance(context).currentDatabase = name
+    }
+
+    /**
+     * Validate and normalize a user-entered database name. Rejects components that
+     * would let appendingPathComponent / getDatabasePath escape the app's database
+     * directory or shadow internal SQLite housekeeping files.
+     */
+    private fun sanitizeDatabaseName(rawName: String): String? {
+        val trimmed = rawName.trim()
+        if (trimmed.isEmpty()) return null
+
+        val base = when {
+            trimmed.endsWith(".sqlite", ignoreCase = true) -> trimmed.dropLast(7)
+            trimmed.endsWith(".db", ignoreCase = true) -> trimmed.dropLast(3)
+            else -> trimmed
+        }
+
+        if (base.isEmpty() ||
+            base.contains('/') ||
+            base.contains('\\') ||
+            base.contains("..") ||
+            base.startsWith('.')) {
+            return null
+        }
+
+        return if (trimmed.endsWith(".db", ignoreCase = true)) "$base.db" else "$base.sqlite"
     }
     
     fun getCurrentDatabaseName(): String = databaseName
@@ -73,27 +105,27 @@ class JournalDatabase private constructor(
      * Create a new database
      */
     fun createNewDatabase(name: String): Boolean {
-        val dbName = if (name.endsWith(".sqlite") || name.endsWith(".db")) name else "$name.sqlite"
+        val dbName = sanitizeDatabaseName(name) ?: return false
         val dbFile = context.getDatabasePath(dbName)
-        
+
         if (dbFile.exists()) {
             return false // Database already exists
         }
-        
+
         // Create the database by opening and closing it
         val helper = JournalDbHelper(context, dbName)
         helper.writableDatabase // This creates the tables
         helper.close()
-        
+
         return true
     }
-    
+
     /**
      * Rename the current database
      */
     fun renameDatabase(newName: String): Boolean {
-        val newDbName = if (newName.endsWith(".sqlite") || newName.endsWith(".db")) newName else "$newName.sqlite"
-        
+        val newDbName = sanitizeDatabaseName(newName) ?: return false
+
         // Check if a database with the new name already exists
         val newDbFile = context.getDatabasePath(newDbName)
         if (newDbFile.exists()) {
@@ -189,9 +221,9 @@ class JournalDatabase private constructor(
      */
     suspend fun importDatabase(sourceFile: File, targetName: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val dbName = if (targetName.endsWith(".sqlite") || targetName.endsWith(".db")) targetName else "$targetName.sqlite"
+            val dbName = sanitizeDatabaseName(targetName) ?: return@withContext false
             val targetFile = context.getDatabasePath(dbName)
-            
+
             sourceFile.copyTo(targetFile, overwrite = true)
             return@withContext true
         } catch (e: Exception) {
@@ -212,22 +244,24 @@ class JournalDatabase private constructor(
         var updated = 0
         var skipped = 0
         
+        val targetDb = dbHelper?.writableDatabase
+        var sourceDb: SQLiteDatabase? = null
         try {
-            // Open source database
-            val sourceDb = SQLiteDatabase.openDatabase(
+            sourceDb = SQLiteDatabase.openDatabase(
                 sourceFile.path,
                 null,
                 SQLiteDatabase.OPEN_READONLY
             )
-            
-            // Get all entries from source database
+
+            targetDb?.beginTransaction()
+
             val sourceCursor = sourceDb.query(
                 TABLE_DIARY,
                 null,
                 null, null, null, null,
                 "$COLUMN_DATE DESC"
             )
-            
+
             sourceCursor.use { cursor ->
                 val dateIdx = cursor.getColumnIndex(COLUMN_DATE)
                 val yearIdx = cursor.getColumnIndex(COLUMN_YEAR)
@@ -236,7 +270,7 @@ class JournalDatabase private constructor(
                 val contentIdx = cursor.getColumnIndex(COLUMN_CONTENT)
                 val createdIdx = cursor.getColumnIndex(COLUMN_CREATED)
                 val updatedIdx = cursor.getColumnIndex(COLUMN_UPDATED)
-                
+
                 while (cursor.moveToNext()) {
                     val date = if (dateIdx >= 0) cursor.getString(dateIdx) ?: "" else ""
                     val year = if (yearIdx >= 0) cursor.getInt(yearIdx) else 0
@@ -295,13 +329,17 @@ class JournalDatabase private constructor(
                 }
             }
             
-            sourceDb.close()
-            refreshEntries()
-            
+            targetDb?.setTransactionSuccessful()
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            if (targetDb != null && targetDb.inTransaction()) {
+                targetDb.endTransaction()
+            }
+            sourceDb?.close()
+            refreshEntries()
         }
-        
+
         return@withContext Triple(imported, updated, skipped)
     }
     
@@ -392,12 +430,28 @@ class JournalDatabase private constructor(
     
     private fun refreshEntriesAsync() {
         scope.launch {
-            val entries = getAllEntriesSync()
+            val y = filterYear
+            val m = filterMonth
+            val entries = if (y != null && m != null) {
+                getEntriesForMonthSync(y, m)
+            } else {
+                getAllEntriesSync()
+            }
             _entriesLiveData.postValue(entries)
         }
     }
-    
+
     fun refreshEntries() {
+        refreshEntriesAsync()
+    }
+
+    /**
+     * Set the month filter used by refreshEntries(). Calendar months are 0-based,
+     * but the schema stores month 1-12.
+     */
+    fun setMonthFilter(year: Int, monthOneBased: Int) {
+        filterYear = year
+        filterMonth = monthOneBased
         refreshEntriesAsync()
     }
 
@@ -470,13 +524,69 @@ class JournalDatabase private constructor(
     }
     
     /**
+     * Get entries for a single (year, month) using the existing
+     * `diary_idx_0` index on (year, month). Month is 1-based per schema.
+     */
+    fun getEntriesForMonthSync(year: Int, monthOneBased: Int): List<JournalEntry> {
+        try {
+            val db = dbHelper?.readableDatabase ?: return emptyList()
+            val entries = mutableListOf<JournalEntry>()
+
+            val cursor = db.query(
+                TABLE_DIARY,
+                null,
+                "$COLUMN_YEAR = ? AND $COLUMN_MONTH = ?",
+                arrayOf(year.toString(), monthOneBased.toString()),
+                null, null,
+                "$COLUMN_DATE DESC"
+            )
+
+            cursor.use {
+                val dateIdx = it.getColumnIndex(COLUMN_DATE)
+                val yearIdx = it.getColumnIndex(COLUMN_YEAR)
+                val monthIdx = it.getColumnIndex(COLUMN_MONTH)
+                val dayIdx = it.getColumnIndex(COLUMN_DAY)
+                val contentIdx = it.getColumnIndex(COLUMN_CONTENT)
+                val createdIdx = it.getColumnIndex(COLUMN_CREATED)
+                val updatedIdx = it.getColumnIndex(COLUMN_UPDATED)
+
+                while (it.moveToNext()) {
+                    val created = if (createdIdx >= 0) it.getString(createdIdx) ?: "" else ""
+                    val updated = if (updatedIdx >= 0 && !it.isNull(updatedIdx)) {
+                        it.getString(updatedIdx)
+                    } else {
+                        created
+                    }
+
+                    entries.add(
+                        JournalEntry(
+                            date = if (dateIdx >= 0) it.getString(dateIdx) ?: "" else "",
+                            year = if (yearIdx >= 0) it.getInt(yearIdx) else 0,
+                            month = if (monthIdx >= 0) it.getInt(monthIdx) else 0,
+                            day = if (dayIdx >= 0) it.getInt(dayIdx) else 0,
+                            content = if (contentIdx >= 0) it.getString(contentIdx) ?: "" else "",
+                            created = created,
+                            updated = updated
+                        )
+                    )
+                }
+            }
+
+            return entries
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return emptyList()
+        }
+    }
+
+    /**
      * Get all entries synchronously
      */
     fun getAllEntriesSync(): List<JournalEntry> {
         try {
             val db = dbHelper?.readableDatabase ?: return emptyList()
             val entries = mutableListOf<JournalEntry>()
-            
+
             val cursor = db.query(
                 TABLE_DIARY,
                 null,
@@ -609,7 +719,9 @@ class JournalDatabase private constructor(
         
         override fun onConfigure(db: SQLiteDatabase) {
             super.onConfigure(db)
-            // WAL mode must be set in onConfigure
+            // WAL mode must be set in onConfigure — matches macOS DigitalGram so synced
+            // SQLite files don't leave stale WAL frames invisible to the other platform.
+            db.enableWriteAheadLogging()
             db.setForeignKeyConstraintsEnabled(true)
         }
     }

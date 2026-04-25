@@ -65,10 +65,14 @@ class MainActivity : AppCompatActivity() {
         
         // Initialize database
         database = JournalDatabase.getInstance(applicationContext)
-        
+        database.setMonthFilter(
+            currentMonth.get(Calendar.YEAR),
+            currentMonth.get(Calendar.MONTH) + 1
+        )
+
         setSupportActionBar(binding.toolbar)
         supportActionBar?.title = "DigitalGram"
-        
+
         setupWindowInsets()
         setupRecyclerView()
         setupBottomBar()
@@ -348,7 +352,10 @@ class MainActivity : AppCompatActivity() {
             .setSingleChoiceItems(months, currentMonthIndex) { dialog, which ->
                 currentMonth.set(Calendar.MONTH, which)
                 updateMonthYear()
-                database.refreshEntries()
+                database.setMonthFilter(
+                    currentMonth.get(Calendar.YEAR),
+                    currentMonth.get(Calendar.MONTH) + 1
+                )
                 dialog.dismiss()
             }
             .setNegativeButton("Cancel", null)
@@ -383,12 +390,15 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("OK") { _, _ ->
                 currentMonth.set(Calendar.YEAR, yearPicker.value)
                 updateMonthYear()
-                database.refreshEntries()
+                database.setMonthFilter(
+                    currentMonth.get(Calendar.YEAR),
+                    currentMonth.get(Calendar.MONTH) + 1
+                )
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
-    
+
     private fun updateDateTime() {
         val now = Calendar.getInstance()
         val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
@@ -430,7 +440,10 @@ class MainActivity : AppCompatActivity() {
                 currentMonth.set(Calendar.MONTH, monthSpinner.selectedItemPosition)
                 currentMonth.set(Calendar.YEAR, yearPicker.value)
                 updateMonthYear()
-                database.refreshEntries()
+                database.setMonthFilter(
+                    currentMonth.get(Calendar.YEAR),
+                    currentMonth.get(Calendar.MONTH) + 1
+                )
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -447,17 +460,13 @@ class MainActivity : AppCompatActivity() {
     private fun observeEntries() {
         database.entries.observe(this) { entries ->
             adapter.setCurrentMonth(currentMonth)
-            adapter.submitList(entries)
-            
-            // Scroll to bottom to show current date last
-            binding.recyclerView.post {
+            adapter.submitEntries(entries) {
                 val itemCount = adapter.itemCount
                 if (itemCount > 0) {
                     binding.recyclerView.scrollToPosition(itemCount - 1)
                 }
             }
-            
-            // Update progress bar based on entries this month
+
             val daysInMonth = currentMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
             val entriesThisMonth = entries.count { entry ->
                 entry.year == currentMonth.get(Calendar.YEAR) &&

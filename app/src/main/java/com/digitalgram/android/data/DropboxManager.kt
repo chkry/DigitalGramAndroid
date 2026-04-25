@@ -13,39 +13,16 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.util.*
-import javax.net.ssl.*
 
 /**
  * Manages Dropbox authentication and file operations for database backup/restore
  */
 class DropboxManager(private val context: Context) {
-    
+
     private val settings = AppSettings.getInstance(context)
-    
-    init {
-        // Configure SSL to trust all certificates (workaround for certificate validation issues)
-        try {
-            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            })
-            
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-            
-            HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
-            HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
-            
-            android.util.Log.d("DropboxManager", "SSL trust configured for all certificates")
-        } catch (e: Exception) {
-            android.util.Log.e("DropboxManager", "Failed to configure SSL trust", e)
-        }
-    }
-    
+
     private val requestConfig = DbxRequestConfig.newBuilder("DigitalGram").build()
     
     companion object {

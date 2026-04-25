@@ -49,6 +49,12 @@ class EditorActivity : AppCompatActivity() {
     private var currentKeyboardHeight = 0
     private var scrollHandler = Handler(Looper.getMainLooper())
     private var scrollRunnable: Runnable? = null
+
+    // Auto-save debounce state at class scope so date-change paths can flush it
+    // synchronously — otherwise typing on day N + navigating to day N+1 within the
+    // 2s window stamps day N's last keystroke onto day N+1's entry.
+    private val autoSaveHandler = Handler(Looper.getMainLooper())
+    private var autoSaveRunnable: Runnable? = null
     
     companion object {
         const val EXTRA_DATE_KEY = "extra_date_key"
@@ -347,16 +353,13 @@ class EditorActivity : AppCompatActivity() {
     
     private fun setupAutoSave() {
         binding.contentEditText.addTextChangedListener(object : android.text.TextWatcher {
-            private var saveRunnable: Runnable? = null
-            private val handler = Handler(Looper.getMainLooper())
-            
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            
+
             override fun afterTextChanged(s: android.text.Editable?) {
                 // Cancel any pending save
-                saveRunnable?.let { handler.removeCallbacks(it) }
-                
+                autoSaveRunnable?.let { autoSaveHandler.removeCallbacks(it) }
+
                 // Debounced scroll to keep cursor visible after text change
                 if (isKeyboardVisible) {
                     scrollRunnable?.let { scrollHandler.removeCallbacks(it) }
@@ -365,19 +368,42 @@ class EditorActivity : AppCompatActivity() {
                     }
                     scrollRunnable?.let { scrollHandler.postDelayed(it, 100) }
                 }
-                
+
                 // Schedule a new save after 2 seconds of no typing
-                saveRunnable = Runnable {
+                autoSaveRunnable = Runnable {
                     autoSaveEntry()
                 }
-                saveRunnable?.let { handler.postDelayed(it, 2000) }
-                
+                autoSaveRunnable?.let { autoSaveHandler.postDelayed(it, 2000) }
+
                 // Scroll to cursor after text changes when keyboard is visible
                 if (isKeyboardVisible) {
                     binding.contentEditText.postDelayed({ scrollToEditText() }, 50)
                 }
             }
         })
+    }
+
+    /**
+     * Flush any pending debounced save against the entry+date that owned the text
+     * at flush time. Call this before navigating to a different day or pausing.
+     */
+    private fun flushPendingAutoSave() {
+        autoSaveRunnable?.let { autoSaveHandler.removeCallbacks(it) }
+        autoSaveRunnable = null
+
+        val content = binding.contentEditText.text.toString().trim()
+        if (content.isEmpty()) return
+
+        // Snapshot the entry and date that this text actually belongs to.
+        val ownerEntry = currentEntry
+        val ownerDate = selectedDate.clone() as Calendar
+
+        lifecycleScope.launch {
+            val entry = ownerEntry?.let { current ->
+                with(JournalEntry.Companion) { current.withUpdatedContent(content) }
+            } ?: JournalEntry.create(ownerDate, content)
+            database.saveEntry(entry)
+        }
     }
     
     private fun autoSaveEntry() {
@@ -573,9 +599,11 @@ class EditorActivity : AppCompatActivity() {
         val datePickerDialog = DatePickerDialog(
             this,
             { _, year, month, dayOfMonth ->
+                // Persist the current entry's last keystroke before swapping context.
+                flushPendingAutoSave()
                 selectedDate.set(year, month, dayOfMonth)
                 updateDateDisplay()
-                
+
                 // Fetch existing entry for the selected date
                 fetchEntryForSelectedDate()
             },
@@ -936,8 +964,16 @@ class EditorActivity : AppCompatActivity() {
         }
     }
     
+    override fun onPause() {
+        // Flush before the activity goes off-screen so a backgrounded process
+        // doesn't lose the last 2 seconds of typing.
+        flushPendingAutoSave()
+        super.onPause()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        autoSaveRunnable?.let { autoSaveHandler.removeCallbacks(it) }
         // Clean up the global layout listener
         globalLayoutListener?.let {
             binding.root.viewTreeObserver.removeOnGlobalLayoutListener(it)
