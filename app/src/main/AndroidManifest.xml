@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    
+    <!-- Dropbox Integration -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="false"
@@ -46,6 +50,7 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="@string/settings"
+            android:launchMode="singleTop"
             android:parentActivityName=".MainActivity"
             android:theme="@style/Theme.DigitalGram" />
         
@@ -69,6 +74,27 @@
             android:theme="@style/Theme.DigitalGram"
             android:exported="false" />
         
+        <!-- Dropbox SDK's internal auth activity (needed to launch browser) -->
+        <activity
+            android:name="com.dropbox.core.android.AuthActivity"
+            android:configChanges="orientation|keyboard"
+            android:exported="false"
+            android:launchMode="singleTask" />
+        
+        <!-- Our Dropbox auth activity - receives OAuth redirect -->
+        <activity
+            android:name=".DropboxAuthActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.DigitalGram">
+            <intent-filter>
+                <data android:scheme="db-cub1jyzclswfroz" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- UCrop Activity -->
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"

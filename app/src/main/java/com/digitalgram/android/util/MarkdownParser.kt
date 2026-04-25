@@ -62,9 +62,10 @@ object MarkdownParser {
     
     private fun processCheckboxes(builder: SpannableStringBuilder, accentColor: Int) {
         // Process unchecked checkboxes: - [ ] item
+        var offset = 0
         var text = builder.toString()
         val uncheckedPattern = Regex("^- \\[ ] ", RegexOption.MULTILINE)
-        var match = uncheckedPattern.find(text)
+        var match = uncheckedPattern.find(text, offset)
         
         while (match != null) {
             val start = match.range.first
@@ -88,14 +89,16 @@ object MarkdownParser {
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
+            offset = checkboxEnd
             text = builder.toString()
-            match = uncheckedPattern.find(text)
+            match = uncheckedPattern.find(text, offset)
         }
         
         // Process checked checkboxes: - [x] item or - [X] item
+        offset = 0
         text = builder.toString()
         val checkedPattern = Regex("^- \\[[xX]] ", RegexOption.MULTILINE)
-        match = checkedPattern.find(text)
+        match = checkedPattern.find(text, offset)
         
         while (match != null) {
             val start = match.range.first
@@ -119,16 +122,18 @@ object MarkdownParser {
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
+            offset = checkboxEnd
             text = builder.toString()
-            match = checkedPattern.find(text)
+            match = checkedPattern.find(text, offset)
         }
     }
     
     private fun processBulletPoints(builder: SpannableStringBuilder) {
         // Process bullet points: - item (but not checkboxes which are already converted)
+        var offset = 0
         var text = builder.toString()
         val bulletPattern = Regex("^- (?!\\[)", RegexOption.MULTILINE)
-        var match = bulletPattern.find(text)
+        var match = bulletPattern.find(text, offset)
         
         while (match != null) {
             val start = match.range.first
@@ -137,14 +142,16 @@ object MarkdownParser {
             // Replace "- " with "• "
             builder.replace(start, end, "• ")
             
+            offset = start + 2
             text = builder.toString()
-            match = bulletPattern.find(text)
+            match = bulletPattern.find(text, offset)
         }
         
         // Also handle * bullet points
+        offset = 0
         text = builder.toString()
         val starBulletPattern = Regex("^\\* (?![*])", RegexOption.MULTILINE)
-        match = starBulletPattern.find(text)
+        match = starBulletPattern.find(text, offset)
         
         while (match != null) {
             val start = match.range.first
@@ -153,8 +160,9 @@ object MarkdownParser {
             // Replace "* " with "• "
             builder.replace(start, end, "• ")
             
+            offset = start + 2
             text = builder.toString()
-            match = starBulletPattern.find(text)
+            match = starBulletPattern.find(text, offset)
         }
     }
     
@@ -269,152 +277,186 @@ object MarkdownParser {
     private fun processBold(builder: SpannableStringBuilder) {
         // Process bold text (**text**)
         val pattern = Regex("\\*\\*([^*]+)\\*\\*")
-        var match = pattern.find(builder.toString())
+        var offset = 0
+        var currentText = builder.toString()
+        var match = pattern.find(currentText, offset)
         
         while (match != null) {
             val fullMatch = match.range
             val contentGroup = match.groups[1]!!
+            val adjustedStart = fullMatch.first
+            val adjustedEnd = fullMatch.last + 1
             
-            // Remove the ** markers
-            builder.delete(fullMatch.last - 1, fullMatch.last + 1)  // Remove trailing **
-            builder.delete(fullMatch.first, fullMatch.first + 2) // Remove leading **
+            // Remove the ** markers - delete from end first to preserve positions
+            builder.delete(adjustedEnd - 2, adjustedEnd)  // Remove trailing **
+            builder.delete(adjustedStart, adjustedStart + 2) // Remove leading **
             
-            // Apply bold style to the content (now at fullMatch.first)
+            // Apply bold style to the content (now at adjustedStart)
+            val contentEnd = adjustedStart + contentGroup.value.length
             builder.setSpan(
                 StyleSpan(Typeface.BOLD),
-                fullMatch.first,
-                fullMatch.first + contentGroup.value.length,
+                adjustedStart,
+                contentEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
-            // Find next match
-            match = pattern.find(builder.toString())
+            // Update offset to continue after this match
+            offset = contentEnd
+            currentText = builder.toString()
+            match = pattern.find(currentText, offset)
         }
     }
     
     private fun processItalic(builder: SpannableStringBuilder) {
         // Process italic text (*text* or _text_)
         val pattern = Regex("(?<!\\*)\\*([^*]+)\\*(?!\\*)|_([^_]+)_")
-        var match = pattern.find(builder.toString())
+        var offset = 0
+        var currentText = builder.toString()
+        var match = pattern.find(currentText, offset)
         
         while (match != null) {
             val fullMatch = match.range
             val contentGroup = match.groups[1] ?: match.groups[2]
             
             if (contentGroup != null) {
-                // Remove the markers
-                builder.delete(fullMatch.last, fullMatch.last + 1)  // Remove trailing marker
-                builder.delete(fullMatch.first, fullMatch.first + 1) // Remove leading marker
+                val adjustedStart = fullMatch.first
+                val adjustedEnd = fullMatch.last + 1
+                
+                // Remove the markers - delete from end first
+                builder.delete(adjustedEnd - 1, adjustedEnd)  // Remove trailing marker
+                builder.delete(adjustedStart, adjustedStart + 1) // Remove leading marker
                 
                 // Apply italic style
+                val contentEnd = adjustedStart + contentGroup.value.length
                 builder.setSpan(
                     StyleSpan(Typeface.ITALIC),
-                    fullMatch.first,
-                    fullMatch.first + contentGroup.value.length,
+                    adjustedStart,
+                    contentEnd,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
+                
+                offset = contentEnd
             }
             
             // Find next match
-            match = pattern.find(builder.toString())
+            currentText = builder.toString()
+            match = pattern.find(currentText, offset)
         }
     }
     
     private fun processStrikethrough(builder: SpannableStringBuilder) {
         // Process strikethrough text (~~text~~)
         val pattern = Regex("~~([^~]+)~~")
-        var match = pattern.find(builder.toString())
+        var offset = 0
+        var currentText = builder.toString()
+        var match = pattern.find(currentText, offset)
         
         while (match != null) {
             val fullMatch = match.range
             val contentGroup = match.groups[1]!!
+            val adjustedStart = fullMatch.first
+            val adjustedEnd = fullMatch.last + 1
             
-            // Remove the ~~ markers
-            builder.delete(fullMatch.last - 1, fullMatch.last + 1)  // Remove trailing ~~
-            builder.delete(fullMatch.first, fullMatch.first + 2) // Remove leading ~~
+            // Remove the ~~ markers - delete from end first
+            builder.delete(adjustedEnd - 2, adjustedEnd)  // Remove trailing ~~
+            builder.delete(adjustedStart, adjustedStart + 2) // Remove leading ~~
             
             // Apply strikethrough style
+            val contentEnd = adjustedStart + contentGroup.value.length
             builder.setSpan(
                 StrikethroughSpan(),
-                fullMatch.first,
-                fullMatch.first + contentGroup.value.length,
+                adjustedStart,
+                contentEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
-            // Find next match
-            match = pattern.find(builder.toString())
+            offset = contentEnd
+            currentText = builder.toString()
+            match = pattern.find(currentText, offset)
         }
     }
     
     private fun processInlineCode(builder: SpannableStringBuilder, codeBackgroundColor: Int) {
         // Process inline code (`code`)
         val pattern = Regex("`([^`]+)`")
-        var match = pattern.find(builder.toString())
+        var offset = 0
+        var currentText = builder.toString()
+        var match = pattern.find(currentText, offset)
         
         while (match != null) {
             val fullMatch = match.range
             val contentGroup = match.groups[1]!!
+            val adjustedStart = fullMatch.first
+            val adjustedEnd = fullMatch.last + 1
             
-            // Remove the ` markers
-            builder.delete(fullMatch.last, fullMatch.last + 1)  // Remove trailing `
-            builder.delete(fullMatch.first, fullMatch.first + 1) // Remove leading `
+            // Remove the ` markers - delete from end first
+            builder.delete(adjustedEnd - 1, adjustedEnd)  // Remove trailing `
+            builder.delete(adjustedStart, adjustedStart + 1) // Remove leading `
             
             // Apply code styling
+            val contentEnd = adjustedStart + contentGroup.value.length
             builder.setSpan(
                 BackgroundColorSpan(codeBackgroundColor),
-                fullMatch.first,
-                fullMatch.first + contentGroup.value.length,
+                adjustedStart,
+                contentEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             builder.setSpan(
                 TypefaceSpan("monospace"),
-                fullMatch.first,
-                fullMatch.first + contentGroup.value.length,
+                adjustedStart,
+                contentEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
-            // Find next match
-            match = pattern.find(builder.toString())
+            offset = contentEnd
+            currentText = builder.toString()
+            match = pattern.find(currentText, offset)
         }
     }
     
     private fun processLinks(builder: SpannableStringBuilder, linkColor: Int) {
         // Process links [text](url)
         val pattern = Regex("\\[([^\\]]+)]\\(([^)]+)\\)")
-        var match = pattern.find(builder.toString())
+        var offset = 0
+        var currentText = builder.toString()
+        var match = pattern.find(currentText, offset)
         
         while (match != null) {
             val fullMatch = match.range
             val textGroup = match.groups[1]!!
             val urlGroup = match.groups[2]!!
+            val adjustedStart = fullMatch.first
+            val adjustedEnd = fullMatch.last + 1
             
             // Replace [text](url) with just text
-            builder.replace(fullMatch.first, fullMatch.last + 1, textGroup.value)
+            builder.replace(adjustedStart, adjustedEnd, textGroup.value)
             
             // Apply link styling to the text
+            val textEnd = adjustedStart + textGroup.value.length
             builder.setSpan(
                 ForegroundColorSpan(linkColor),
-                fullMatch.first,
-                fullMatch.first + textGroup.value.length,
+                adjustedStart,
+                textEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             builder.setSpan(
                 UnderlineSpan(),
-                fullMatch.first,
-                fullMatch.first + textGroup.value.length,
+                adjustedStart,
+                textEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
             // Add clickable span with normalized URL
             builder.setSpan(
                 CustomURLSpan(urlGroup.value),
-                fullMatch.first,
-                fullMatch.first + textGroup.value.length,
+                adjustedStart,
+                textEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             
-            // Find next match
-            match = pattern.find(builder.toString())
+            offset = textEnd
+            currentText = builder.toString()
+            match = pattern.find(currentText, offset)
         }
     }
 }

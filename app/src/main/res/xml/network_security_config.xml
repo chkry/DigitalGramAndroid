@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Prevent cleartext (HTTP) traffic -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- Debug override to bypass certificate validation -->
+    <debug-overrides>
         <trust-anchors>
-            <!-- Trust system certificates -->
             <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+    
+    <!-- Trust all certificates for development -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

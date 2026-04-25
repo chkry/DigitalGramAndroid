@@ -599,7 +599,7 @@
                     app:tint="@color/text_hint" />
             </LinearLayout>
 
-            <!-- EXPORT -->
+            <!-- EXPORT ENTRIES TO TEXT -->
             <LinearLayout
                 android:id="@+id/exportRow"
                 android:layout_width="match_parent"
@@ -615,7 +615,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="⁞ EXPORT"
+                    android:text="@string/export"
                     android:textSize="16sp"
                     android:textColor="@color/text_dark"
                     android:fontFamily="sans-serif-condensed"
@@ -629,6 +629,234 @@
                     android:padding="8dp"
                     android:contentDescription="@string/export"
                     app:tint="@color/text_hint" />
+            </LinearLayout>
+
+            <!-- EXPORT DATABASE -->
+            <LinearLayout
+                android:id="@+id/exportDatabaseRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/exportDatabaseLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/export_database"
+                    android:textSize="16sp"
+                    android:textColor="@color/text_dark"
+                    android:fontFamily="sans-serif-condensed"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_circle_outline"
+                    android:padding="8dp"
+                    android:contentDescription="@string/export_database"
+                    app:tint="@color/text_hint" />
+            </LinearLayout>
+
+            <!-- DROPBOX BACKUP SECTION -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/text_hint"
+                android:layout_marginVertical="16dp"
+                android:alpha="0.3" />
+
+            <!-- DROPBOX STATUS -->
+            <LinearLayout
+                android:id="@+id/dropboxStatusRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⁞ DROPBOX BACKUP"
+                    android:textSize="16sp"
+                    android:textColor="@color/text_dark"
+                    android:fontFamily="sans-serif-condensed"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/dropboxStatusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Not connected"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_hint"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Buttons Container -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="start">
+
+                    <!-- Connect/Disconnect Button -->
+                    <Button
+                        android:id="@+id/dropboxConnectButton"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Connect"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-condensed"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:textColor="@color/accent_red"
+                        app:strokeColor="@color/accent_red"
+                        app:strokeWidth="1dp" />
+
+                    <!-- Backup Button -->
+                    <Button
+                        android:id="@+id/dropboxBackupButton"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Backup"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-condensed"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:enabled="false"
+                        android:textColor="@color/text_hint"
+                        app:strokeColor="@color/text_hint"
+                        app:strokeWidth="1dp" />
+
+                    <!-- Restore Button -->
+                    <Button
+                        android:id="@+id/dropboxRestoreButton"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Restore"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-condensed"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="8dp"
+                        android:enabled="false"
+                        android:textColor="@color/text_hint"
+                        app:strokeColor="@color/text_hint"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- GOOGLE DRIVE BACKUP SECTION -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/text_hint"
+                android:layout_marginVertical="16dp"
+                android:alpha="0.3" />
+
+            <!-- GOOGLE DRIVE STATUS -->
+            <LinearLayout
+                android:id="@+id/googleDriveStatusRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⁞ GOOGLE DRIVE BACKUP"
+                    android:textSize="16sp"
+                    android:textColor="@color/text_dark"
+                    android:fontFamily="sans-serif-condensed"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/googleDriveStatusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Not connected"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_hint"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Buttons Container -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="start">
+
+                    <!-- Connect/Disconnect Button -->
+                    <Button
+                        android:id="@+id/googleDriveConnectButton"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Connect"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-condensed"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:textColor="@color/accent_red"
+                        app:strokeColor="@color/accent_red"
+                        app:strokeWidth="1dp" />
+
+                    <!-- Backup Button -->
+                    <Button
+                        android:id="@+id/googleDriveBackupButton"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Backup"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-condensed"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:enabled="false"
+                        android:textColor="@color/text_hint"
+                        app:strokeColor="@color/text_hint"
+                        app:strokeWidth="1dp" />
+
+                    <!-- Restore Button -->
+                    <Button
+                        android:id="@+id/googleDriveRestoreButton"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Restore"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-condensed"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="8dp"
+                        android:enabled="false"
+                        android:textColor="@color/text_hint"
+                        app:strokeColor="@color/text_hint"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- DATABASES SECTION -->

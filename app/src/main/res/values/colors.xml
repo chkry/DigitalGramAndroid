@@ -8,6 +8,7 @@
     <color name="text_hint">#9E9E9E</color>
     <color name="border_black">#000000</color>
     <color name="accent_red">#B85450</color>
+    <color name="accent_green">#4CAF50</color>
     <color name="stripe_gray">#E0E0E0</color>
     <color name="ic_launcher_background">#F5F1E8</color>
     <color name="link_blue">#1976D2</color>

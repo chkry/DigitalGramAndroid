@@ -121,6 +121,26 @@ class AppSettings private constructor(context: Context) {
         get() = prefs.getString(KEY_STORAGE_PATH, null)
         set(value) = prefs.edit { putString(KEY_STORAGE_PATH, value) }
     
+    // Dropbox access token (stored securely)
+    var dropboxAccessToken: String
+        get() = securePrefs.getString(KEY_DROPBOX_TOKEN, "") ?: ""
+        set(value) = securePrefs.edit { putString(KEY_DROPBOX_TOKEN, value) }
+    
+    // Check if connected to Dropbox
+    fun isDropboxConnected(): Boolean {
+        return dropboxAccessToken.isNotEmpty()
+    }
+    
+    // Google Drive account email (stored securely)
+    var googleDriveAccountEmail: String
+        get() = securePrefs.getString(KEY_GOOGLE_DRIVE_EMAIL, "") ?: ""
+        set(value) = securePrefs.edit { putString(KEY_GOOGLE_DRIVE_EMAIL, value) }
+    
+    // Check if connected to Google Drive
+    fun isGoogleDriveConnected(): Boolean {
+        return googleDriveAccountEmail.isNotEmpty()
+    }
+    
     // Wallpaper URI for background image
     var wallpaperUri: String?
         get() = prefs.getString(KEY_WALLPAPER_URI, null)
@@ -266,6 +286,8 @@ class AppSettings private constructor(context: Context) {
         private const val KEY_CURRENT_DATABASE = "current_database"
         private const val KEY_STORAGE_PATH = "storage_path"
         private const val KEY_WALLPAPER_URI = "wallpaper_uri"
+        private const val KEY_DROPBOX_TOKEN = "dropbox_access_token"
+        private const val KEY_GOOGLE_DRIVE_EMAIL = "google_drive_account_email"
         private const val KEY_CUSTOM_BG = "custom_bg_color"
         private const val KEY_CUSTOM_TEXT = "custom_text_color"
         private const val KEY_CUSTOM_SECONDARY_TEXT = "custom_secondary_text_color"

@@ -26,8 +26,9 @@
     <string name="hour_down">Hour Down</string>
     <string name="minute_up">Minute Up</string>
     <string name="minute_down">Minute Down</string>
-    <string name="backup_restore">Backup / Restore</string>
-    <string name="export">Export</string>
+    <string name="backup_restore">Backup / Restore Current Database</string>
+    <string name="export">Export Entries to Text</string>
+    <string name="export_database">Export Database</string>
     <string name="on">ON</string>
     <string name="off">OFF</string>
     

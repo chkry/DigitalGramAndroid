@@ -27,6 +27,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.digitalgram.android.data.AppSettings
+import com.digitalgram.android.data.DropboxManager
+import com.digitalgram.android.data.GoogleDriveManager
 import com.digitalgram.android.data.JournalDatabase
 import com.digitalgram.android.databinding.ActivitySettingsBinding
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +48,8 @@ class SettingsActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var settings: AppSettings
+    private lateinit var dropboxManager: DropboxManager
+    private lateinit var googleDriveManager: GoogleDriveManager
     private lateinit var executor: Executor
     private lateinit var biometricPrompt: BiometricPrompt
     
@@ -77,7 +81,7 @@ class SettingsActivity : AppCompatActivity() {
         uri?.let { createBackup(it) }
     }
     
-    // Restore file picker
+    // Restore file picker - only accept .db and .sqlite files
     private val restoreFilePicker = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -123,6 +127,8 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(binding.root)
         
         settings = AppSettings.getInstance(this)
+        dropboxManager = DropboxManager.getInstance(this)
+        googleDriveManager = GoogleDriveManager(this)
         
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -140,7 +146,10 @@ class SettingsActivity : AppCompatActivity() {
         setupWallpaper()
         setupDatabases()
         setupBackupRestore()
+        setupDropbox()
+        setupGoogleDrive()
         setupExport()
+        setupDatabaseExport()
         setupAboutLinks()
         
         loadSettings()
@@ -150,6 +159,10 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         // Refresh theme colors in case they were edited in ThemeEditorActivity
         applyThemeColors()
+        // Refresh Dropbox UI in case connection state changed
+        updateDropboxUI()
+        // Refresh Google Drive UI
+        updateGoogleDriveUI()
     }
     
     private fun applyThemeColors() {
@@ -807,7 +820,7 @@ class SettingsActivity : AppCompatActivity() {
             "Import Database",
             "Import & Merge Database",
             "Delete Current Database",
-            "Export Current Database"
+            "Share Current Database"
         )
         
         AlertDialog.Builder(this)
@@ -1283,6 +1296,12 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
     
+    private fun setupDatabaseExport() {
+        binding.exportDatabaseRow.setOnClickListener {
+            exportCurrentDatabase()
+        }
+    }
+    
     private fun loadSettings() {
         binding.themeValue.text = getThemeDisplayName(settings.theme)
         binding.fontFamilyValue.text = AppSettings.ALL_FONTS.find { it.first == settings.fontFamily }?.second ?: "Bookerly"
@@ -1434,9 +1453,53 @@ class SettingsActivity : AppCompatActivity() {
                         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                         backupFilePicker.launch("digitalgram_backup_$timestamp.db")
                     }
-                    1 -> restoreFilePicker.launch(arrayOf("*/*"))
+                    1 -> restoreFilePicker.launch(arrayOf("application/x-sqlite3", "application/vnd.sqlite3", "application/octet-stream"))
                 }
             }
+            .show()
+    }
+    
+    private fun revertLastRestore(backupFile: File) {
+        if (!backupFile.exists()) {
+            Toast.makeText(this, "Backup file not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("Revert Merge?")
+            .setMessage("This will restore your database to the state before the merge. All changes from the merge will be lost.")
+            .setPositiveButton("Revert") { _, _ ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val database = JournalDatabase.getInstance(applicationContext)
+                        val dbName = database.getCurrentDatabaseName()
+                        val dbFile = getDatabasePath(dbName)
+                        
+                        // Close database
+                        database.close()
+                        
+                        // Restore from backup
+                        backupFile.copyTo(dbFile, overwrite = true)
+                        
+                        // Delete the backup file
+                        backupFile.delete()
+                        
+                        // Reinitialize database
+                        JournalDatabase.reinitialize(applicationContext)
+                        
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@SettingsActivity, "Database reverted successfully", Toast.LENGTH_SHORT).show()
+                            recreate()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@SettingsActivity, "Revert failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
     
@@ -1465,39 +1528,68 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun restoreBackup(uri: Uri) {
+        // Validate file extension
+        val fileName = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(0)
+            } else null
+        } ?: "unknown"
+        
+        if (!fileName.endsWith(".db", ignoreCase = true) && !fileName.endsWith(".sqlite", ignoreCase = true)) {
+            Toast.makeText(this, "Please select a .db or .sqlite file", Toast.LENGTH_LONG).show()
+            return
+        }
+        
         AlertDialog.Builder(this)
             .setTitle(R.string.restore_from_backup)
-            .setMessage("This will replace all current data. Continue?")
-            .setPositiveButton("Restore") { _, _ ->
+            .setMessage("This will merge entries from \"$fileName\" with your current database.\n\nNewer entries will be kept in case of conflicts.\n\nAn automatic backup will be created that you can revert if needed.")
+            .setPositiveButton("Merge") { _, _ ->
                 CoroutineScope(Dispatchers.IO).launch {
+                    val tempFile = File(cacheDir, "restore_temp.sqlite")
+                    val backupFile = File(cacheDir, "auto_backup_before_restore.db")
+                    
                     try {
                         val database = JournalDatabase.getInstance(applicationContext)
                         val dbName = database.getCurrentDatabaseName()
                         val dbFile = getDatabasePath(dbName)
                         
-                        // Close the database
-                        database.close()
+                        // Create automatic backup before merging
+                        dbFile.copyTo(backupFile, overwrite = true)
                         
+                        // Copy selected file to temp location
                         contentResolver.openInputStream(uri)?.use { input ->
-                            FileOutputStream(dbFile).use { output ->
+                            FileOutputStream(tempFile).use { output ->
                                 input.copyTo(output)
                             }
                         }
                         
-                        // Reinitialize database
-                        JournalDatabase.reinitialize(applicationContext)
+                        // Merge the databases
+                        val (imported, updated, skipped) = database.importAndMergeDatabase(tempFile)
+                        
+                        // Cleanup temp file
+                        tempFile.delete()
                         
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(this@SettingsActivity, R.string.restore_success, Toast.LENGTH_SHORT).show()
-                            // Restart app to reload database
-                            val intent = packageManager.getLaunchIntentForPackage(packageName)
-                            intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            startActivity(intent)
-                            finish()
+                            // Show success with stats and revert option
+                            AlertDialog.Builder(this@SettingsActivity)
+                                .setTitle("Merge Complete")
+                                .setMessage("Import successful!\n\nNew entries: $imported\nUpdated entries: $updated\nSkipped entries: $skipped\n\nAn automatic backup was created before the merge.")
+                                .setPositiveButton("OK") { _, _ ->
+                                    // Refresh the activity
+                                    recreate()
+                                }
+                                .setNegativeButton("Revert Merge") { _, _ ->
+                                    revertLastRestore(backupFile)
+                                }
+                                .setCancelable(false)
+                                .show()
                         }
                     } catch (e: Exception) {
+                        e.printStackTrace()
+                        tempFile.delete()
+                        
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(this@SettingsActivity, R.string.restore_failed, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@SettingsActivity, "${getString(R.string.restore_failed)}: ${e.message}", Toast.LENGTH_LONG).show()
                         }
                     }
                 }
@@ -1512,20 +1604,26 @@ class SettingsActivity : AppCompatActivity() {
                 val database = JournalDatabase.getInstance(applicationContext)
                 val entries = database.getAllEntriesSync()
                 
+                // Sort entries by date (oldest first for chronological reading)
+                val sortedEntries = entries.sortedBy { it.date }
+                
                 val dateFormat = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                 
                 val content = buildString {
                     appendLine("DigitalGram Journal Export")
-                    appendLine("Exported: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())}")
+                    appendLine("Exported: ${timeFormat.format(Date())}")
                     appendLine("Database: ${database.getCurrentDatabaseName()}")
-                    appendLine("=" .repeat(50))
+                    appendLine("Total Entries: ${sortedEntries.size}")
+                    appendLine("=".repeat(50))
                     appendLine()
                     
-                    entries.forEach { entry ->
+                    sortedEntries.forEach { entry ->
                         appendLine(dateFormat.format(entry.toDate()))
                         appendLine("-".repeat(30))
                         appendLine(entry.content)
                         appendLine()
+                        appendLine("=".repeat(50))
                         appendLine()
                     }
                 }
@@ -1538,8 +1636,9 @@ class SettingsActivity : AppCompatActivity() {
                     Toast.makeText(this@SettingsActivity, R.string.export_success, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@SettingsActivity, R.string.export_failed, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SettingsActivity, "${getString(R.string.export_failed)}: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -1611,6 +1710,618 @@ class SettingsActivity : AppCompatActivity() {
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
         }
+    }
+    
+    // DROPBOX BACKUP/RESTORE
+    
+    // Activity result launcher for Dropbox auth
+    private val dropboxAuthLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        android.util.Log.d("SettingsActivity", "Dropbox auth result: ${result.resultCode}")
+        when (result.resultCode) {
+            DropboxAuthActivity.RESULT_AUTH_SUCCESS -> {
+                Toast.makeText(this, "✓ Connected to Dropbox!", Toast.LENGTH_LONG).show()
+                updateDropboxUI()
+            }
+            DropboxAuthActivity.RESULT_AUTH_FAILED -> {
+                Toast.makeText(this, "Dropbox connection failed or cancelled", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    private fun startDropboxAuth() {
+        val intent = Intent(this, DropboxAuthActivity::class.java)
+        dropboxAuthLauncher.launch(intent)
+    }
+
+    private fun setupDropbox() {
+        updateDropboxUI()
+        binding.dropboxConnectButton.setOnClickListener {
+            if (dropboxManager.isAuthenticated()) {
+                showDropboxDisconnectDialog()
+            } else {
+                startDropboxAuth()
+            }
+        }
+        binding.dropboxBackupButton.setOnClickListener {
+            backupToDropbox()
+        }
+        binding.dropboxRestoreButton.setOnClickListener {
+            showDropboxRestoreDialog()
+        }
+    }
+    
+    private fun updateDropboxUI() {
+        val isConnected = dropboxManager.isAuthenticated()
+        
+        if (isConnected) {
+            binding.dropboxStatusText.text = "Connected"
+            binding.dropboxStatusText.setTextColor(ContextCompat.getColor(this, R.color.accent_green))
+            binding.dropboxConnectButton.text = "Disconnect"
+            binding.dropboxBackupButton.isEnabled = true
+            binding.dropboxRestoreButton.isEnabled = true
+            
+            // Update button colors when enabled
+            (binding.dropboxBackupButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.accent_red))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.accent_red)
+            }
+            (binding.dropboxRestoreButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.accent_red))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.accent_red)
+            }
+            
+            // Fetch and display last backup info
+            CoroutineScope(Dispatchers.Main).launch {
+                val result = dropboxManager.getLatestBackup()
+                if (result.isSuccess) {
+                    result.getOrNull()?.let { backup ->
+                        binding.dropboxStatusText.text = "Last backup: ${backup.getFormattedDate()}"
+                    }
+                }
+            }
+        } else {
+            binding.dropboxStatusText.text = "Not connected"
+            binding.dropboxStatusText.setTextColor(ContextCompat.getColor(this, R.color.text_hint))
+            binding.dropboxConnectButton.text = "Connect"
+            binding.dropboxBackupButton.isEnabled = false
+            binding.dropboxRestoreButton.isEnabled = false
+            
+            // Reset button colors when disabled
+            (binding.dropboxBackupButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.text_hint))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.text_hint)
+            }
+            (binding.dropboxRestoreButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.text_hint))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.text_hint)
+            }
+        }
+    }
+    
+    private fun showDropboxDisconnectDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Disconnect from Dropbox?")
+            .setMessage("This will remove the Dropbox connection. Your backups will remain in Dropbox.")
+            .setPositiveButton("Disconnect") { _, _ ->
+                dropboxManager.disconnect()
+                updateDropboxUI()
+                Toast.makeText(this, "Disconnected from Dropbox", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+    
+    private fun backupToDropbox() {
+        val database = JournalDatabase.getInstance(applicationContext)
+        val databaseFile = getDatabasePath(settings.currentDatabase)
+        val databaseName = settings.currentDatabase.removeSuffix(".sqlite").removeSuffix(".db")
+        
+        if (!databaseFile.exists()) {
+            Toast.makeText(this, "Database file not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Close database before backup
+        database.close()
+        
+        binding.dropboxBackupButton.isEnabled = false
+        binding.dropboxBackupButton.text = "Uploading..."
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            val result = dropboxManager.uploadBackup(databaseFile, databaseName)
+            
+            // Reopen database
+            JournalDatabase.getInstance(applicationContext)
+            
+            if (result.isSuccess) {
+                val metadata = result.getOrNull()
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Backup uploaded successfully",
+                    Toast.LENGTH_SHORT
+                ).show()
+                updateDropboxUI()
+            } else {
+                val error = result.exceptionOrNull()
+                val errorMsg = error?.message ?: "Unknown error"
+                
+                // Check if it's a certificate error
+                if (errorMsg.contains("CertPathValidator", ignoreCase = true) ||
+                    errorMsg.contains("Trust anchor", ignoreCase = true) ||
+                    errorMsg.contains("certificate", ignoreCase = true)) {
+                    
+                    AlertDialog.Builder(this@SettingsActivity)
+                        .setTitle("Dropbox Connection Issue")
+                        .setMessage("Unable to connect to Dropbox. This may be due to network restrictions.\n\nTry:\n• Using mobile data instead of Wi-Fi\n• Disabling VPN\n• Using Google Drive backup instead")
+                        .setPositiveButton("Try Google Drive") { _, _ ->
+                            // Highlight Google Drive section
+                            binding.googleDriveConnectButton.requestFocus()
+                        }
+                        .setNegativeButton("OK", null)
+                        .show()
+                } else {
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "Backup failed: $errorMsg",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            
+            binding.dropboxBackupButton.isEnabled = true
+            binding.dropboxBackupButton.text = "Backup"
+        }
+    }
+    
+    private fun showDropboxRestoreDialog() {
+        binding.dropboxRestoreButton.isEnabled = false
+        binding.dropboxRestoreButton.text = "Loading..."
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            val result = dropboxManager.listBackups()
+            
+            if (result.isSuccess) {
+                val backups = result.getOrNull() ?: emptyList()
+                
+                if (backups.isEmpty()) {
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "No backups found in Dropbox",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    binding.dropboxRestoreButton.isEnabled = true
+                    binding.dropboxRestoreButton.text = "Restore"
+                    return@launch
+                }
+                
+                // Show list of backups
+                val backupNames = backups.map { "${it.name} (${it.getFormattedDate()})" }.toTypedArray()
+                
+                AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle("Select Backup to Restore")
+                    .setItems(backupNames) { _, which ->
+                        val selectedBackup = backups[which]
+                        confirmAndRestoreFromDropbox(selectedBackup)
+                    }
+                    .setNegativeButton("Cancel") { _, _ ->
+                        binding.dropboxRestoreButton.isEnabled = true
+                        binding.dropboxRestoreButton.text = "Restore"
+                    }
+                    .setOnCancelListener {
+                        binding.dropboxRestoreButton.isEnabled = true
+                        binding.dropboxRestoreButton.text = "Restore"
+                    }
+                    .show()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Failed to list backups: $error",
+                    Toast.LENGTH_LONG
+                ).show()
+                binding.dropboxRestoreButton.isEnabled = true
+                binding.dropboxRestoreButton.text = "Restore"
+            }
+        }
+    }
+    
+    private fun confirmAndRestoreFromDropbox(backup: com.digitalgram.android.data.BackupFileInfo) {
+        AlertDialog.Builder(this)
+            .setTitle("Restore from Dropbox?")
+            .setMessage("This will merge entries from \"${backup.name}\" with your current database. Newer entries will be kept in case of conflicts.\\n\\nSize: ${backup.getFormattedSize()}\\nDate: ${backup.getFormattedDate()}")
+            .setPositiveButton("Restore & Merge") { _, _ ->
+                restoreFromDropbox(backup)
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                binding.dropboxRestoreButton.isEnabled = true
+                binding.dropboxRestoreButton.text = "Restore"
+            }
+            .show()
+    }
+    
+    private fun restoreFromDropbox(backup: com.digitalgram.android.data.BackupFileInfo) {
+        binding.dropboxRestoreButton.text = "Downloading..."
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            val tempFile = File(cacheDir, "dropbox_restore_temp.sqlite")
+            
+            try {
+                val downloadResult = dropboxManager.downloadBackup(backup.path, tempFile)
+                
+                if (downloadResult.isFailure) {
+                    throw downloadResult.exceptionOrNull() ?: Exception("Download failed")
+                }
+                
+                // Close current database
+                val database = JournalDatabase.getInstance(applicationContext)
+                database.close()
+                
+                // Import and merge
+                withContext(Dispatchers.IO) {
+                    val db = JournalDatabase.getInstance(applicationContext)
+                    db.importAndMergeDatabase(tempFile)
+                }
+                
+                // Cleanup
+                tempFile.delete()
+                
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Restore completed successfully",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Refresh UI
+                recreate()
+                
+            } catch (e: Exception) {
+                tempFile.delete()
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Restore failed: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+                
+                binding.dropboxRestoreButton.isEnabled = true
+                binding.dropboxRestoreButton.text = "Restore"
+            }
+        }
+    }
+    
+    // GOOGLE DRIVE BACKUP/RESTORE
+    
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        android.util.Log.d("SettingsActivity", "Google Sign-In result: ${result.resultCode}, data: ${result.data}")
+        if (result.resultCode == RESULT_OK) {
+            val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(Exception::class.java)
+                android.util.Log.d("SettingsActivity", "Google account: ${account?.email}")
+                if (googleDriveManager.handleSignInResult(account)) {
+                    Toast.makeText(this, "✓ Connected to Google Drive!", Toast.LENGTH_LONG).show()
+                    updateGoogleDriveUI()
+                } else {
+                    Toast.makeText(this, "Google Drive sign-in failed", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsActivity", "Google Sign-In exception: ${e.javaClass.simpleName}", e)
+                android.util.Log.e("SettingsActivity", "Error message: ${e.message}")
+                android.util.Log.e("SettingsActivity", "Error status code: ${e.cause}")
+                
+                // Get more detailed error info
+                val statusCode = if (e.message?.contains("10:") == true) {
+                    "Error 10 (Developer Error)"
+                } else if (e.message?.contains("12501") == true) {
+                    "Error 12501 (User Cancelled)"
+                } else if (e.message?.contains("12500") == true) {
+                    "Error 12500 (API Error)"
+                } else {
+                    "Unknown Error"
+                }
+                
+                val errorMsg = "$statusCode: ${e.message}\n\n" +
+                    "DIAGNOSTIC INFO:\n" +
+                    "Package: ${packageName}\n" +
+                    "App Version: ${packageManager.getPackageInfo(packageName, 0).versionName}\n\n" +
+                    "COMMON CAUSES (for Play Store installs):\n" +
+                    "1. OAuth Client ID NOT added for Play Store App Signing key\n" +
+                    "   → Go to Google Cloud Console\n" +
+                    "   → Add OAuth client for: F2:7B:8D:94:C6:DC:86:40:4E:42:B2:03:15:BA:BD:FB:32:B4:3F:C9\n\n" +
+                    "2. OAuth Consent Screen still in TESTING mode\n" +
+                    "   → Change to PRODUCTION\n\n" +
+                    "3. User not added as test user (if still in Testing)\n" +
+                    "   → Add your Google account as test user\n\n" +
+                    "4. Package name mismatch: should be com.digitalgram.android"
+                
+                AlertDialog.Builder(this)
+                    .setTitle("Google Drive Sign-In Failed")
+                    .setMessage(errorMsg)
+                    .setPositiveButton("OK", null)
+                    .setNeutralButton("View Logs") { _, _ ->
+                        // Copy logs to clipboard for debugging
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Google Drive Debug", errorMsg)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(this, "Diagnostic info copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }
+                    .show()
+            }
+        } else {
+            android.util.Log.w("SettingsActivity", "Google Sign-In cancelled (result code: ${result.resultCode})")
+            Toast.makeText(this, "Google Drive sign-in cancelled", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun setupGoogleDrive() {
+        updateGoogleDriveUI()
+        binding.googleDriveConnectButton.setOnClickListener {
+            if (googleDriveManager.isAuthenticated()) {
+                showGoogleDriveDisconnectDialog()
+            } else {
+                startGoogleDriveSignIn()
+            }
+        }
+        binding.googleDriveBackupButton.setOnClickListener {
+            backupToGoogleDrive()
+        }
+        binding.googleDriveRestoreButton.setOnClickListener {
+            showGoogleDriveRestoreDialog()
+        }
+    }
+    
+    private fun updateGoogleDriveUI() {
+        val isConnected = googleDriveManager.isAuthenticated()
+        
+        if (isConnected) {
+            binding.googleDriveStatusText.text = "Connected: ${settings.googleDriveAccountEmail}"
+            binding.googleDriveStatusText.setTextColor(ContextCompat.getColor(this, R.color.accent_green))
+            binding.googleDriveConnectButton.text = "Disconnect"
+            binding.googleDriveBackupButton.isEnabled = true
+            binding.googleDriveRestoreButton.isEnabled = true
+            
+            // Update button colors when enabled
+            (binding.googleDriveBackupButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.accent_red))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.accent_red)
+            }
+            (binding.googleDriveRestoreButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.accent_red))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.accent_red)
+            }
+        } else {
+            binding.googleDriveStatusText.text = "Not connected"
+            binding.googleDriveStatusText.setTextColor(ContextCompat.getColor(this, R.color.text_hint))
+            binding.googleDriveConnectButton.text = "Connect"
+            binding.googleDriveBackupButton.isEnabled = false
+            binding.googleDriveRestoreButton.isEnabled = false
+            
+            // Reset button colors when disabled
+            (binding.googleDriveBackupButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.text_hint))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.text_hint)
+            }
+            (binding.googleDriveRestoreButton as? com.google.android.material.button.MaterialButton)?.apply {
+                setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.text_hint))
+                strokeColor = ContextCompat.getColorStateList(this@SettingsActivity, R.color.text_hint)
+            }
+        }
+    }
+    
+    private fun startGoogleDriveSignIn() {
+        val signInIntent = googleDriveManager.getSignInClient(this).signInIntent
+        googleSignInLauncher.launch(signInIntent)
+    }
+    
+    private fun showGoogleDriveDisconnectDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Disconnect from Google Drive?")
+            .setMessage("This will remove the Google Drive connection. Your backups will remain in Google Drive.")
+            .setPositiveButton("Disconnect") { _, _ ->
+                googleDriveManager.disconnect(this)
+                updateGoogleDriveUI()
+                Toast.makeText(this, "Disconnected from Google Drive", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+    
+    private fun backupToGoogleDrive() {
+        android.util.Log.d("SettingsActivity", "===== Google Drive Backup Start =====")
+        val database = JournalDatabase.getInstance(applicationContext)
+        val databaseFile = getDatabasePath(settings.currentDatabase)
+        val databaseName = settings.currentDatabase.removeSuffix(".sqlite").removeSuffix(".db")
+        
+        android.util.Log.d("SettingsActivity", "Database: ${databaseFile.absolutePath}")
+        android.util.Log.d("SettingsActivity", "Database exists: ${databaseFile.exists()}")
+        android.util.Log.d("SettingsActivity", "Is authenticated: ${googleDriveManager.isAuthenticated()}")
+        
+        if (!databaseFile.exists()) {
+            Toast.makeText(this, "Database file not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        if (!googleDriveManager.isAuthenticated()) {
+            Toast.makeText(this, "Not connected to Google Drive. Please connect first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        // Close database before backup
+        database.close()
+        
+        binding.googleDriveBackupButton.isEnabled = false
+        binding.googleDriveBackupButton.text = "Uploading..."
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            android.util.Log.d("SettingsActivity", "Starting upload...")
+            val result = googleDriveManager.uploadBackup(databaseFile, databaseName)
+            
+            android.util.Log.d("SettingsActivity", "Upload result: ${result.isSuccess}")
+            if (result.isFailure) {
+                android.util.Log.e("SettingsActivity", "Upload error", result.exceptionOrNull())
+            }
+            
+            // Reopen database
+            JournalDatabase.getInstance(applicationContext)
+            
+            if (result.isSuccess) {
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Backup uploaded to Google Drive",
+                    Toast.LENGTH_SHORT
+                ).show()
+                updateGoogleDriveUI()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                android.util.Log.e("SettingsActivity", "Backup failed: $error")
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Backup failed: $error",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            
+            binding.googleDriveBackupButton.isEnabled = true
+            binding.googleDriveBackupButton.text = "Backup"
+        }
+    }
+    
+    private fun showGoogleDriveRestoreDialog() {
+        binding.googleDriveRestoreButton.isEnabled = false
+        binding.googleDriveRestoreButton.text = "Loading..."
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            val result = googleDriveManager.listBackups()
+            
+            if (result.isSuccess) {
+                val backups = result.getOrNull() ?: emptyList()
+                
+                if (backups.isEmpty()) {
+                    Toast.makeText(this@SettingsActivity, "No backups found in Google Drive", Toast.LENGTH_SHORT).show()
+                    binding.googleDriveRestoreButton.isEnabled = true
+                    binding.googleDriveRestoreButton.text = "Restore"
+                    return@launch
+                }
+                
+                val backupNames = backups.map { "${it.name} (${it.getFormattedDate()})" }.toTypedArray()
+                
+                AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle("Select Backup to Restore")
+                    .setItems(backupNames) { _, which ->
+                        val selectedBackup = backups[which]
+                        confirmAndRestoreFromGoogleDrive(selectedBackup)
+                    }
+                    .setNegativeButton("Cancel") { _, _ ->
+                        binding.googleDriveRestoreButton.isEnabled = true
+                        binding.googleDriveRestoreButton.text = "Restore"
+                    }
+                    .setOnCancelListener {
+                        binding.googleDriveRestoreButton.isEnabled = true
+                        binding.googleDriveRestoreButton.text = "Restore"
+                    }
+                    .show()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Failed to list backups: $error",
+                    Toast.LENGTH_LONG
+                ).show()
+                binding.googleDriveRestoreButton.isEnabled = true
+                binding.googleDriveRestoreButton.text = "Restore"
+            }
+        }
+    }
+    
+    private fun confirmAndRestoreFromGoogleDrive(backup: com.digitalgram.android.data.BackupFileInfo) {
+        AlertDialog.Builder(this)
+            .setTitle("Restore from Google Drive?")
+            .setMessage("This will merge entries from \"${backup.name}\" with your current database. Newer entries will be kept in case of conflicts.\\n\\nSize: ${backup.getFormattedSize()}\\nDate: ${backup.getFormattedDate()}")
+            .setPositiveButton("Restore & Merge") { _, _ ->
+                restoreFromGoogleDrive(backup)
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                binding.googleDriveRestoreButton.isEnabled = true
+                binding.googleDriveRestoreButton.text = "Restore"
+            }
+            .show()
+    }
+    
+    private fun restoreFromGoogleDrive(backup: com.digitalgram.android.data.BackupFileInfo) {
+        binding.googleDriveRestoreButton.text = "Downloading..."
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            val tempFile = File(cacheDir, "googledrive_restore_temp.sqlite")
+            
+            try {
+                val downloadResult = googleDriveManager.downloadBackup(backup.path, tempFile)
+                
+                if (downloadResult.isFailure) {
+                    throw downloadResult.exceptionOrNull() ?: Exception("Download failed")
+                }
+                
+                // Close current database
+                val database = JournalDatabase.getInstance(applicationContext)
+                database.close()
+                
+                // Import and merge
+                withContext(Dispatchers.IO) {
+                    val db = JournalDatabase.getInstance(applicationContext)
+                    db.importAndMergeDatabase(tempFile)
+                }
+                
+                // Cleanup
+                tempFile.delete()
+                
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Restore completed successfully",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Refresh UI
+                recreate()
+                
+            } catch (e: Exception) {
+                tempFile.delete()
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "Restore failed: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+                
+                binding.googleDriveRestoreButton.isEnabled = true
+                binding.googleDriveRestoreButton.text = "Restore"
+            }
+        }
+    }
+    
+    private fun showSHA1Instructions() {
+        // Get SHA-1 for debug keystore
+        val sha1 = try {
+            val process = Runtime.getRuntime().exec("keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android")
+            val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+            val output = reader.readText()
+            val sha1Line = output.lines().find { it.trim().startsWith("SHA1:") }
+            sha1Line?.substringAfter("SHA1:")?.trim() ?: "Could not extract SHA-1"
+        } catch (e: Exception) {
+            "Error: ${e.message}"
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("Get Your SHA-1 Fingerprint")
+            .setMessage("For Debug Build:\n\nRun this command in terminal:\n\nkeytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android\n\nThen copy the SHA1 value to Google Cloud Console > Credentials > OAuth 2.0 Client IDs")
+            .setPositiveButton("Copy Command") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("SHA-1 Command", "keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android")
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "Command copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
     
     override fun onSupportNavigateUp(): Boolean {

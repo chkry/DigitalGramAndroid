@@ -15,10 +15,19 @@ android {
         applicationId = "com.digitalgram.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.1.0"
+        versionCode = 14
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Load Dropbox app key from local.properties
+        val localPropertiesFile = rootProject.file("local.properties")
+        val localProperties = Properties()
+        if (localPropertiesFile.exists()) {
+            localProperties.load(FileInputStream(localPropertiesFile))
+        }
+        val dropboxAppKey = localProperties.getProperty("dropboxAppKey") ?: ""
+        buildConfigField("String", "DROPBOX_APP_KEY", "\"$dropboxAppKey\"")
     }
 
     signingConfigs {
@@ -59,6 +68,22 @@ android {
     
     buildFeatures {
         viewBinding = true
+        buildConfig = true
+    }
+    
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0"
+            )
+        }
     }
 }
 
@@ -95,6 +120,15 @@ dependencies {
     
     // Image cropping library
     implementation("com.github.yalantis:ucrop:2.2.8")
+    
+    // Dropbox SDK for cloud backup
+    implementation("com.dropbox.core:dropbox-core-sdk:5.4.5")
+    
+    // Google Drive API for cloud backup
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.http-client:google-http-client-gson:1.43.3")
     
     // Testing
     testImplementation("junit:junit:4.13.2")
