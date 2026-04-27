@@ -11,9 +11,6 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:enforceStatusBarContrast">false</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 
     <style name="Theme.DigitalGram" parent="Base.Theme.DigitalGram" />

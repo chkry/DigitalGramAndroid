@@ -18,8 +18,11 @@ import com.digitalgram.android.data.AppSettings
 import com.digitalgram.android.data.JournalDatabase
 import com.digitalgram.android.databinding.ActivityMainBinding
 import com.digitalgram.android.ui.JournalAdapter
+import androidx.lifecycle.lifecycleScope
 import com.digitalgram.android.util.ImageUtils
+import com.digitalgram.android.util.ImageUtilsAsync
 import com.digitalgram.android.util.ThemeColors
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -194,23 +197,11 @@ class MainActivity : AppCompatActivity() {
         
         // Apply wallpaper if set
         val wallpaperUri = settings.wallpaperUri
-        if (wallpaperUri != null) {
-            try {
-                val uri = android.net.Uri.parse(wallpaperUri)
-                val bitmap = ImageUtils.loadOrientedBitmap(contentResolver, uri)
-                val drawable = bitmap?.let { android.graphics.drawable.BitmapDrawable(resources, it) }
-                if (drawable != null) {
-                    binding.coordinatorLayout.background = drawable
-                } else {
-                    binding.coordinatorLayout.setBackgroundColor(themeColors.backgroundColor)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // Fallback to theme background color if wallpaper fails
-                binding.coordinatorLayout.setBackgroundColor(themeColors.backgroundColor)
-            }
+        if (!wallpaperUri.isNullOrEmpty()) {
+            ImageUtilsAsync.loadWallpaperAsync(
+                contentResolver, android.net.Uri.parse(wallpaperUri), binding.coordinatorLayout, resources, lifecycleScope
+            )
         } else {
-            // No wallpaper, use theme background color
             binding.coordinatorLayout.setBackgroundColor(themeColors.backgroundColor)
         }
         

@@ -16,7 +16,9 @@ import android.view.ViewTreeObserver
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.Toast
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.digitalgram.android.BuildConfig
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -26,6 +28,7 @@ import com.digitalgram.android.data.JournalDatabase
 import com.digitalgram.android.data.JournalEntry
 import com.digitalgram.android.databinding.ActivityEditorBinding
 import com.digitalgram.android.util.ImageUtils
+import com.digitalgram.android.util.ImageUtilsAsync
 import com.digitalgram.android.util.MarkdownParser
 import com.digitalgram.android.util.ThemeColors
 import kotlinx.coroutines.launch
@@ -57,6 +60,7 @@ class EditorActivity : AppCompatActivity() {
     private var autoSaveRunnable: Runnable? = null
     
     companion object {
+        private const val TAG = "Editor"
         const val EXTRA_DATE_KEY = "extra_date_key"
     }
     
@@ -79,7 +83,7 @@ class EditorActivity : AppCompatActivity() {
         try {
             database = JournalDatabase.getInstance(applicationContext)
         } catch (e: Exception) {
-            e.printStackTrace()
+            if (BuildConfig.DEBUG) Log.w(TAG, "db init failed", e)
             Toast.makeText(this, "Error initializing database", Toast.LENGTH_SHORT).show()
             finish()
             return
@@ -431,23 +435,11 @@ class EditorActivity : AppCompatActivity() {
         
         // Apply wallpaper if set
         val wallpaperUri = settings.wallpaperUri
-        if (wallpaperUri != null) {
-            try {
-                val uri = android.net.Uri.parse(wallpaperUri)
-                val bitmap = ImageUtils.loadOrientedBitmap(contentResolver, uri)
-                val drawable = bitmap?.let { android.graphics.drawable.BitmapDrawable(resources, it) }
-                if (drawable != null) {
-                    binding.rootLayout.background = drawable
-                } else {
-                    binding.rootLayout.setBackgroundColor(themeColors.backgroundColor)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // Fallback to theme background color if wallpaper fails
-                binding.rootLayout.setBackgroundColor(themeColors.backgroundColor)
-            }
+        if (!wallpaperUri.isNullOrEmpty()) {
+            ImageUtilsAsync.loadWallpaperAsync(
+                contentResolver, android.net.Uri.parse(wallpaperUri), binding.rootLayout, resources, lifecycleScope
+            )
         } else {
-            // No wallpaper, use theme background color
             binding.rootLayout.setBackgroundColor(themeColors.backgroundColor)
         }
         
@@ -813,9 +805,8 @@ class EditorActivity : AppCompatActivity() {
                 // Trigger redraw
                 binding.previewText.invalidate()
             } catch (e: Exception) {
-                // Fallback to plain text if markdown parsing fails
                 binding.previewText.text = content
-                e.printStackTrace()
+                if (BuildConfig.DEBUG) Log.w(TAG, "markdown parse failed", e)
             }
         } else {
             // Show editor

@@ -40,7 +40,29 @@ class CustomURLSpan(private val url: String) : URLSpan(url) {
  * Markdown parser for rendering markdown text to styled SpannableString
  */
 object MarkdownParser {
-    
+
+    private val previewCache = android.util.LruCache<String, SpannableStringBuilder>(64)
+
+    fun parsePreview(
+        entryId: String,
+        text: String,
+        linkColor: Int,
+        codeBackgroundColor: Int,
+        textColor: Int,
+        accentColor: Int = linkColor,
+        themeKey: Int,
+        maxChars: Int = 500
+    ): SpannableStringBuilder {
+        val truncated = if (text.length > maxChars) text.substring(0, maxChars) + "…" else text
+        val key = "$entryId|${text.length}|${text.hashCode()}|$themeKey"
+        previewCache.get(key)?.let { return it }
+        val parsed = parse(truncated, linkColor, codeBackgroundColor, textColor, accentColor)
+        previewCache.put(key, parsed)
+        return parsed
+    }
+
+    fun clearPreviewCache() { previewCache.evictAll() }
+
     fun parse(text: String, linkColor: Int, codeBackgroundColor: Int, textColor: Int, accentColor: Int = linkColor): SpannableStringBuilder {
         val builder = SpannableStringBuilder(text)
         

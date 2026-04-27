@@ -15,7 +15,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
+import android.util.Log
 import android.widget.Toast
+import com.digitalgram.android.BuildConfig
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -31,6 +33,7 @@ import com.digitalgram.android.data.DropboxManager
 import com.digitalgram.android.data.GoogleDriveManager
 import com.digitalgram.android.data.JournalDatabase
 import com.digitalgram.android.databinding.ActivitySettingsBinding
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -556,7 +559,7 @@ class SettingsActivity : AppCompatActivity() {
                 setResult(RESULT_OK)
                 
             } catch (e: Exception) {
-                e.printStackTrace()
+                if (BuildConfig.DEBUG) Log.w(TAG, "move db failed", e)
                 Toast.makeText(this@SettingsActivity, "Failed to move database: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
@@ -629,7 +632,7 @@ class SettingsActivity : AppCompatActivity() {
                 setResult(RESULT_OK)
                 
             } catch (e: Exception) {
-                e.printStackTrace()
+                if (BuildConfig.DEBUG) Log.w(TAG, "copy db failed", e)
                 Toast.makeText(this@SettingsActivity, "Failed to copy database: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
@@ -726,7 +729,7 @@ class SettingsActivity : AppCompatActivity() {
             
             cropLauncher.launch(uCrop.getIntent(this))
         } catch (e: Exception) {
-            e.printStackTrace()
+            if (BuildConfig.DEBUG) Log.w(TAG, "crop editor failed", e)
             Toast.makeText(this, "Failed to open crop editor: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -766,7 +769,7 @@ class SettingsActivity : AppCompatActivity() {
                 setResult(RESULT_OK)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            if (BuildConfig.DEBUG) Log.w(TAG, "set wallpaper failed", e)
             Toast.makeText(this, "Failed to set wallpaper: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -789,14 +792,15 @@ class SettingsActivity : AppCompatActivity() {
     
     private fun showDatabaseDialog() {
         val database = JournalDatabase.getInstance(applicationContext)
+        lifecycleScope.launch {
         val databases = database.getAvailableDatabases()
         val currentDb = database.getCurrentDatabaseName()
-        
+
         val items = databases.map { db ->
             if (db == currentDb) "$db ✓" else db
         }.toTypedArray()
-        
-        AlertDialog.Builder(this)
+
+        AlertDialog.Builder(this@SettingsActivity)
             .setTitle(R.string.databases)
             .setItems(items) { _, which ->
                 val selectedDb = databases[which]
@@ -812,8 +816,9 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+        } // end lifecycleScope.launch
     }
-    
+
     private fun showDatabaseOptionsDialog() {
         val options = arrayOf(
             "Rename Database",
@@ -869,13 +874,15 @@ class SettingsActivity : AppCompatActivity() {
                 } else if (newName.contains("/") || newName.contains("\\")) {
                     Toast.makeText(this, "Database name cannot contain slashes", Toast.LENGTH_SHORT).show()
                 } else {
-                    val renamed = database.renameDatabase(newName)
-                    if (renamed) {
-                        Toast.makeText(this, "Database renamed successfully", Toast.LENGTH_SHORT).show()
-                        binding.databaseValue.text = database.getCurrentDatabaseName()
-                        setResult(RESULT_OK)
-                    } else {
-                        Toast.makeText(this, "Failed to rename database. Name may already exist.", Toast.LENGTH_LONG).show()
+                    lifecycleScope.launch {
+                        val renamed = database.renameDatabase(newName)
+                        if (renamed) {
+                            Toast.makeText(this@SettingsActivity, "Database renamed successfully", Toast.LENGTH_SHORT).show()
+                            binding.databaseValue.text = database.getCurrentDatabaseName()
+                            setResult(RESULT_OK)
+                        } else {
+                            Toast.makeText(this@SettingsActivity, "Failed to rename database. Name may already exist.", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
@@ -956,7 +963,7 @@ class SettingsActivity : AppCompatActivity() {
                 tempFile.delete()
                 
             } catch (e: Exception) {
-                e.printStackTrace()
+                if (BuildConfig.DEBUG) Log.w(TAG, "import failed", e)
                 Toast.makeText(this@SettingsActivity, "Import error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
@@ -975,13 +982,15 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle("Delete Database")
             .setMessage("Are you sure you want to delete '$currentDb'? This action cannot be undone.")
             .setPositiveButton("Delete") { _, _ ->
-                if (database.deleteCurrentDatabase()) {
-                    Toast.makeText(this, "Database deleted", Toast.LENGTH_SHORT).show()
-                    JournalDatabase.reinitialize(applicationContext)
-                    updateDatabaseUI()
-                    setResult(RESULT_OK)
-                } else {
-                    Toast.makeText(this, "Failed to delete database", Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    if (database.deleteCurrentDatabase()) {
+                        Toast.makeText(this@SettingsActivity, "Database deleted", Toast.LENGTH_SHORT).show()
+                        JournalDatabase.reinitialize(applicationContext)
+                        updateDatabaseUI()
+                        setResult(RESULT_OK)
+                    } else {
+                        Toast.makeText(this@SettingsActivity, "Failed to delete database", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -1020,7 +1029,7 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(shareIntent, "Export Database"))
             
         } catch (e: Exception) {
-            e.printStackTrace()
+            if (BuildConfig.DEBUG) Log.w(TAG, "export failed", e)
             Toast.makeText(this, "Export error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -1037,11 +1046,13 @@ class SettingsActivity : AppCompatActivity() {
                 val name = input.text.toString().trim()
                 if (name.isNotEmpty()) {
                     val database = JournalDatabase.getInstance(applicationContext)
-                    if (database.createNewDatabase(name)) {
-                        Toast.makeText(this, R.string.database_created, Toast.LENGTH_SHORT).show()
-                        switchDatabase(if (name.endsWith(".sqlite") || name.endsWith(".db")) name else "$name.sqlite")
-                    } else {
-                        Toast.makeText(this, R.string.database_exists, Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch {
+                        if (database.createNewDatabase(name)) {
+                            Toast.makeText(this@SettingsActivity, R.string.database_created, Toast.LENGTH_SHORT).show()
+                            switchDatabase(if (name.endsWith(".sqlite") || name.endsWith(".db")) name else "$name.sqlite")
+                        } else {
+                            Toast.makeText(this@SettingsActivity, R.string.database_exists, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -1059,20 +1070,22 @@ class SettingsActivity : AppCompatActivity() {
             // Set result to notify MainActivity to reload data
             setResult(RESULT_OK)
         } catch (e: Exception) {
-            e.printStackTrace()
+            if (BuildConfig.DEBUG) Log.w(TAG, "switch db failed", e)
             Toast.makeText(this, "Error switching database: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
     
     private fun updateDatabaseUI() {
-        try {
-            val database = JournalDatabase.getInstance(applicationContext)
-            binding.databaseValue.text = database.getCurrentDatabaseName()
-            binding.databaseCount.text = getString(R.string.total_databases, database.getAvailableDatabases().size)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            binding.databaseValue.text = "Error"
-            binding.databaseCount.text = "Error"
+        val database = JournalDatabase.getInstance(applicationContext)
+        binding.databaseValue.text = database.getCurrentDatabaseName()
+        lifecycleScope.launch {
+            try {
+                val count = database.getAvailableDatabases().size
+                binding.databaseCount.text = getString(R.string.total_databases, count)
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) Log.w(TAG, "db count failed", e)
+                binding.databaseCount.text = "Error"
+            }
         }
     }
     
@@ -1492,7 +1505,7 @@ class SettingsActivity : AppCompatActivity() {
                             recreate()
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        if (BuildConfig.DEBUG) Log.w(TAG, "revert failed", e)
                         withContext(Dispatchers.Main) {
                             Toast.makeText(this@SettingsActivity, "Revert failed: ${e.message}", Toast.LENGTH_LONG).show()
                         }
@@ -1585,9 +1598,9 @@ class SettingsActivity : AppCompatActivity() {
                                 .show()
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        if (BuildConfig.DEBUG) Log.w(TAG, "restore failed", e)
                         tempFile.delete()
-                        
+
                         withContext(Dispatchers.Main) {
                             Toast.makeText(this@SettingsActivity, "${getString(R.string.restore_failed)}: ${e.message}", Toast.LENGTH_LONG).show()
                         }
@@ -1602,10 +1615,10 @@ class SettingsActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val database = JournalDatabase.getInstance(applicationContext)
-                val entries = database.getAllEntriesSync()
+                val entries = database.getAllEntries()
                 
-                // Sort entries by date (oldest first for chronological reading)
-                val sortedEntries = entries.sortedBy { it.date }
+                // Sort entries by date (oldest first for chronological reading), skip empty ones
+                val sortedEntries = entries.filter { it.content.isNotBlank() }.sortedBy { it.date }
                 
                 val dateFormat = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault())
                 val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
@@ -1636,7 +1649,7 @@ class SettingsActivity : AppCompatActivity() {
                     Toast.makeText(this@SettingsActivity, R.string.export_success, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                if (BuildConfig.DEBUG) Log.w(TAG, "export db failed", e)
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@SettingsActivity, "${getString(R.string.export_failed)}: ${e.message}", Toast.LENGTH_LONG).show()
                 }
@@ -2052,7 +2065,15 @@ class SettingsActivity : AppCompatActivity() {
             }
         } else {
             android.util.Log.w("SettingsActivity", "Google Sign-In cancelled (result code: ${result.resultCode})")
-            Toast.makeText(this, "Google Drive sign-in cancelled", Toast.LENGTH_SHORT).show()
+            AlertDialog.Builder(this)
+                .setTitle("Sign-In Cancelled")
+                .setMessage(
+                    "Google Drive sign-in was cancelled.\n\n" +
+                    "If you saw an 'This app isn't verified' warning screen, " +
+                    "scroll down and tap Advanced → Go to DigitalGram (unsafe) to continue."
+                )
+                .setPositiveButton("OK", null)
+                .show()
         }
     }
     
@@ -2330,6 +2351,7 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     companion object {
+        private const val TAG = "Settings"
         const val REQUEST_PASSCODE = 1001
         const val REQUEST_NOTIFICATION_PERMISSION = 1002
         const val NOTIFICATION_CHANNEL_ID = "digitalgram_reminders"

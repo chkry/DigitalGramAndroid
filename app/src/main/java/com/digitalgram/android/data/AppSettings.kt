@@ -5,18 +5,35 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+
+enum class LockState { Ok, KeystoreUnavailable }
+
+enum class VerifyResult { Match, NoMatch, Locked, Migrated }
 
 /**
  * App Settings manager using SharedPreferences
  * Handles all user preferences for the DigitalGram app
+ *
+ * Callers must check getLockState() == LockState.Ok before relying on any
+ * securePrefs-backed value (passcode, tokens). When KeystoreUnavailable,
+ * securePrefs is a no-op stub and all reads return defaults.
  */
 class AppSettings private constructor(context: Context) {
-    
+
+    private var lockState: LockState = LockState.Ok
+
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val securePrefs: SharedPreferences by lazy {
         createSecurePrefs(context)
     }
-    
+
+    fun getLockState(): LockState = lockState
+
     private fun createSecurePrefs(context: Context): SharedPreferences {
         return try {
             val masterKey = MasterKey.Builder(context)
@@ -30,7 +47,6 @@ class AppSettings private constructor(context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            // If encrypted prefs fail (e.g., keystore corruption), try to delete and recreate
             try {
                 context.deleteSharedPreferences(SECURE_PREFS_NAME)
                 val masterKey = MasterKey.Builder(context)
@@ -44,9 +60,8 @@ class AppSettings private constructor(context: Context) {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e2: Exception) {
-                // Final fallback to regular prefs if all else fails
-                e2.printStackTrace()
-                context.getSharedPreferences(SECURE_PREFS_NAME + "_fallback", Context.MODE_PRIVATE)
+                lockState = LockState.KeystoreUnavailable
+                NoOpSharedPreferences()
             }
         }
     }
@@ -242,9 +257,81 @@ class AppSettings private constructor(context: Context) {
         }
     }
     
-    // Verify passcode
+    // Verify passcode — routes through PBKDF2 migration path; backward-compat Boolean wrapper.
     fun verifyPasscode(input: String): Boolean {
-        return passcode == input
+        return when (verifyPasscodeAndMigrate(input)) {
+            VerifyResult.Match, VerifyResult.Migrated -> true
+            VerifyResult.NoMatch, VerifyResult.Locked -> false
+        }
+    }
+
+    /**
+     * Verify the passcode and transparently migrate plaintext storage to PBKDF2 on first match.
+     * Returns Locked when the keystore is unavailable.
+     */
+    fun verifyPasscodeAndMigrate(input: String): VerifyResult {
+        if (lockState == LockState.KeystoreUnavailable) return VerifyResult.Locked
+
+        if (prefs.getBoolean(KEY_PASSCODE_MIGRATED, false)) {
+            val saltB64 = prefs.getString(KEY_PASSCODE_SALT, null) ?: return VerifyResult.NoMatch
+            val hashB64 = securePrefs.getString(KEY_PASSCODE_HASH, null) ?: return VerifyResult.NoMatch
+            val stored = Base64.getDecoder().decode(hashB64)
+            val computed = pbkdf2Hash(input, Base64.getDecoder().decode(saltB64))
+            return if (MessageDigest.isEqual(stored, computed)) VerifyResult.Match else VerifyResult.NoMatch
+        }
+
+        val oldPlaintext = securePrefs.getString(KEY_PASSCODE, "") ?: ""
+        if (oldPlaintext.isEmpty()) return VerifyResult.NoMatch
+        if (oldPlaintext != input) return VerifyResult.NoMatch
+
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val hash = pbkdf2Hash(input, salt)
+        prefs.edit { putString(KEY_PASSCODE_SALT, Base64.getEncoder().encodeToString(salt)) }
+        securePrefs.edit { putString(KEY_PASSCODE_HASH, Base64.getEncoder().encodeToString(hash)) }
+        prefs.edit { putBoolean(KEY_PASSCODE_MIGRATED, true) }
+        securePrefs.edit { putString(KEY_PASSCODE, "") }
+        return VerifyResult.Migrated
+    }
+
+    /**
+     * Set a new passcode using PBKDF2. Generates a fresh salt, stores hash in securePrefs,
+     * salt in plain prefs, and clears any legacy plaintext slot.
+     */
+    fun updatePasscode(newPasscode: String) {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val hash = pbkdf2Hash(newPasscode, salt)
+        prefs.edit { putString(KEY_PASSCODE_SALT, Base64.getEncoder().encodeToString(salt)) }
+        securePrefs.edit { putString(KEY_PASSCODE_HASH, Base64.getEncoder().encodeToString(hash)) }
+        prefs.edit { putBoolean(KEY_PASSCODE_MIGRATED, true) }
+        securePrefs.edit { putString(KEY_PASSCODE, "") }
+    }
+
+    private fun pbkdf2Hash(password: String, salt: ByteArray): ByteArray {
+        val spec = PBEKeySpec(password.toCharArray(), salt, 100_000, 256)
+        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+    }
+
+    /**
+     * Get (or generate) the SQLCipher database passphrase. The 32-byte random key is
+     * stored Base64-encoded in EncryptedSharedPreferences, so it never lives on disk
+     * unencrypted. If the keystore is unavailable the caller cannot proceed safely —
+     * we throw rather than silently degrade to a plaintext or weak-key database.
+     */
+    fun getDbPassphrase(): ByteArray {
+        if (lockState == LockState.KeystoreUnavailable) {
+            throw IllegalStateException("Keystore unavailable; cannot derive DB passphrase")
+        }
+        val existing = securePrefs.getString(KEY_DB_PASSPHRASE, null)
+        if (existing != null) return Base64.getDecoder().decode(existing)
+        val key = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        securePrefs.edit { putString(KEY_DB_PASSPHRASE, Base64.getEncoder().encodeToString(key)) }
+        return key
+    }
+
+    fun isDbMigratedToSqlcipher(): Boolean = prefs.getBoolean(KEY_DB_MIGRATED_SQLCIPHER, false)
+
+    fun markDbMigratedToSqlcipher() {
+        prefs.edit { putBoolean(KEY_DB_MIGRATED_SQLCIPHER, true) }
     }
     
     // Reset all settings to default
@@ -280,6 +367,9 @@ class AppSettings private constructor(context: Context) {
         private const val KEY_BORDER_STYLE = "border_style"
         private const val KEY_PASSCODE_ENABLED = "passcode_enabled"
         private const val KEY_PASSCODE = "passcode"
+        private const val KEY_PASSCODE_SALT = "passcode_salt"
+        private const val KEY_PASSCODE_HASH = "passcode_hash_v2"
+        private const val KEY_PASSCODE_MIGRATED = "passcode_migrated_v2"
         private const val KEY_FINGERPRINT_ENABLED = "fingerprint_enabled"
         private const val KEY_REMINDER_ENABLED = "reminder_enabled"
         private const val KEY_REMINDER_TIME = "reminder_time"
@@ -299,6 +389,8 @@ class AppSettings private constructor(context: Context) {
         private const val KEY_CUSTOM_DOT = "custom_dot_color"
         private const val KEY_CUSTOM_TODAY_DOT = "custom_today_dot_color"
         private const val KEY_CUSTOM_DATE_BG = "custom_date_bg_color"
+        private const val KEY_DB_PASSPHRASE = "db_passphrase_v1"
+        private const val KEY_DB_MIGRATED_SQLCIPHER = "db_migrated_sqlcipher"
         
         // Theme values
         const val THEME_DEFAULT = "LIGHT"
@@ -409,4 +501,30 @@ class AppSettings private constructor(context: Context) {
             }
         }
     }
+}
+
+private class NoOpSharedPreferences : SharedPreferences {
+    private val noOpEditor = object : SharedPreferences.Editor {
+        override fun putString(key: String, value: String?) = this
+        override fun putStringSet(key: String, values: MutableSet<String>?) = this
+        override fun putInt(key: String, value: Int) = this
+        override fun putLong(key: String, value: Long) = this
+        override fun putFloat(key: String, value: Float) = this
+        override fun putBoolean(key: String, value: Boolean) = this
+        override fun remove(key: String) = this
+        override fun clear() = this
+        override fun commit() = true
+        override fun apply() {}
+    }
+    override fun getAll(): Map<String, *> = emptyMap<String, Any>()
+    override fun getString(key: String, defValue: String?) = defValue
+    override fun getStringSet(key: String, defValues: MutableSet<String>?) = defValues
+    override fun getInt(key: String, defValue: Int) = defValue
+    override fun getLong(key: String, defValue: Long) = defValue
+    override fun getFloat(key: String, defValue: Float) = defValue
+    override fun getBoolean(key: String, defValue: Boolean) = defValue
+    override fun contains(key: String) = false
+    override fun edit() = noOpEditor
+    override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {}
+    override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {}
 }

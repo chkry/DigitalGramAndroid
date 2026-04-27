@@ -12,10 +12,10 @@ android {
 
     defaultConfig {
         applicationId = "com.digitalgram.android"
-        minSdk = 26
+        minSdk = 24
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.2.1"
+        versionCode = 19
+        versionName = "1.2.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -57,6 +57,7 @@ android {
     }
     
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -87,6 +88,8 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
+
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
@@ -98,6 +101,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-process:$lifecycleVersion")
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
@@ -110,6 +114,11 @@ dependencies {
     
     // Security for encrypted SharedPreferences
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // SQLCipher for at-rest database encryption (modern artifact)
+    implementation("net.zetetic:sqlcipher-android:4.6.1")
+    // Required by sqlcipher-android: SupportSQLite* interfaces it implements
+    implementation("androidx.sqlite:sqlite:2.4.0")
     
     // Image cropping library
     implementation("com.github.yalantis:ucrop:2.2.8")

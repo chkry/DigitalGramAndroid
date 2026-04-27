@@ -1,6 +1,7 @@
 package com.digitalgram.android
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -10,6 +11,8 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.digitalgram.android.data.AppSettings
+import com.digitalgram.android.data.LockState
+import com.digitalgram.android.data.VerifyResult
 import com.digitalgram.android.databinding.ActivityPasscodeBinding
 import java.util.concurrent.Executor
 
@@ -36,7 +39,13 @@ class PasscodeActivity : AppCompatActivity() {
         executor = ContextCompat.getMainExecutor(this)
         
         mode = PasscodeMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: PasscodeMode.VERIFY.name)
-        
+
+        if (settings.getLockState() == LockState.KeystoreUnavailable) {
+            Toast.makeText(this, "Security disabled — keystore unavailable", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
         applyThemeColors()
         setupUI()
         setupKeypad()
@@ -172,80 +181,104 @@ class PasscodeActivity : AppCompatActivity() {
     }
     
     private fun handleSetMode() {
-        if (!isConfirming) {
-            firstPasscode = currentPasscode.toString()
-            isConfirming = true
-            currentPasscode.clear()
-            updateTitle()
-            updateDots()
-        } else {
-            if (currentPasscode.toString() == firstPasscode) {
-                settings.passcode = firstPasscode
-                setResult(RESULT_OK)
-                finish()
-            } else {
-                showError(getString(R.string.passcode_mismatch))
-                firstPasscode = ""
-                isConfirming = false
-                currentPasscode.clear()
+        try {
+            if (!isConfirming) {
+                firstPasscode = currentPasscode.toString()
+                isConfirming = true
                 updateTitle()
                 updateDots()
+            } else {
+                if (currentPasscode.toString() == firstPasscode) {
+                    settings.updatePasscode(firstPasscode)
+                    firstPasscode = "0".repeat(firstPasscode.length)
+                    firstPasscode = ""
+                    setResult(RESULT_OK)
+                    finish()
+                } else {
+                    showError(getString(R.string.passcode_mismatch))
+                    firstPasscode = ""
+                    isConfirming = false
+                    updateTitle()
+                    updateDots()
+                }
             }
+        } finally {
+            for (i in 0 until currentPasscode.length) currentPasscode.setCharAt(i, '0')
+            currentPasscode.clear()
+            updateDots()
         }
     }
     
     private fun handleVerifyMode() {
-        if (settings.verifyPasscode(currentPasscode.toString())) {
-            setResult(RESULT_OK)
-            finish()
-        } else {
-            attempts++
-            showError(getString(R.string.wrong_passcode))
+        val input = currentPasscode.toString()
+        try {
+            val result = settings.verifyPasscodeAndMigrate(input)
+            when (result) {
+                VerifyResult.Match -> {
+                    setResult(RESULT_OK)
+                    finish()
+                }
+                VerifyResult.Migrated -> {
+                    if (BuildConfig.DEBUG) Log.i("Passcode", "migrated to PBKDF2")
+                    setResult(RESULT_OK)
+                    finish()
+                }
+                VerifyResult.NoMatch -> {
+                    attempts++
+                    showError(getString(R.string.wrong_passcode))
+                    updateDots()
+                    if (attempts >= MAX_ATTEMPTS) {
+                        Toast.makeText(this, "Too many attempts", Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                }
+                VerifyResult.Locked -> {
+                    Toast.makeText(this, "Security disabled — keystore unavailable", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+        } finally {
+            for (i in 0 until currentPasscode.length) currentPasscode.setCharAt(i, '0')
             currentPasscode.clear()
             updateDots()
-            
-            if (attempts >= MAX_ATTEMPTS) {
-                Toast.makeText(this, "Too many attempts", Toast.LENGTH_LONG).show()
-                finish()
-            }
         }
     }
     
     private fun handleChangeMode() {
-        // First verify current passcode
-        if (firstPasscode.isEmpty() && !isConfirming) {
-            if (settings.verifyPasscode(currentPasscode.toString())) {
-                // Current passcode verified, now set new one
-                firstPasscode = "verified"
-                currentPasscode.clear()
+        try {
+            if (firstPasscode.isEmpty() && !isConfirming) {
+                if (settings.verifyPasscode(currentPasscode.toString())) {
+                    firstPasscode = "verified"
+                    updateTitle()
+                    updateDots()
+                } else {
+                    showError(getString(R.string.wrong_passcode))
+                    updateDots()
+                }
+            } else if (firstPasscode == "verified" && !isConfirming) {
+                firstPasscode = currentPasscode.toString()
+                isConfirming = true
                 updateTitle()
                 updateDots()
-            } else {
-                showError(getString(R.string.wrong_passcode))
-                currentPasscode.clear()
-                updateDots()
+            } else if (isConfirming) {
+                if (currentPasscode.toString() == firstPasscode) {
+                    settings.updatePasscode(firstPasscode)
+                    firstPasscode = "0".repeat(firstPasscode.length)
+                    firstPasscode = ""
+                    setResult(RESULT_OK)
+                    finish()
+                } else {
+                    showError(getString(R.string.passcode_mismatch))
+                    firstPasscode = ""
+                    isConfirming = false
+                    updateTitle()
+                    updateDots()
+                }
             }
-        } else if (firstPasscode == "verified" && !isConfirming) {
-            // Store new passcode for confirmation
-            firstPasscode = currentPasscode.toString()
-            isConfirming = true
+        } finally {
+            for (i in 0 until currentPasscode.length) currentPasscode.setCharAt(i, '0')
             currentPasscode.clear()
-            updateTitle()
             updateDots()
-        } else if (isConfirming) {
-            // Confirm new passcode
-            if (currentPasscode.toString() == firstPasscode) {
-                settings.passcode = firstPasscode
-                setResult(RESULT_OK)
-                finish()
-            } else {
-                showError(getString(R.string.passcode_mismatch))
-                firstPasscode = "verified"
-                isConfirming = false
-                currentPasscode.clear()
-                updateTitle()
-                updateDots()
-            }
         }
     }
     

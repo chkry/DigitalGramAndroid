@@ -60,13 +60,13 @@ class DropboxManager(private val context: Context) {
             return Result.failure(IllegalStateException("Dropbox app key is missing. Add dropboxAppKey to local.properties."))
         }
         return try {
-            android.util.Log.d("DropboxManager", "Starting OAuth with app key: ${appKey.take(10)}...")
+            if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "Starting OAuth flow")
             Auth.startOAuth2PKCE(
                 activityContext,
                 appKey,
                 requestConfig
             )
-            android.util.Log.d("DropboxManager", "OAuth flow initiated successfully")
+            if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "OAuth flow initiated")
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("DropboxManager", "OAuth start failed", e)
@@ -79,60 +79,23 @@ class DropboxManager(private val context: Context) {
      * Call this in onResume() of your activity
      */
     fun completeAuthentication(): Boolean {
-        android.util.Log.d("DropboxManager", "===== Auth completion attempt =====")
-        
+        if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "Auth completion attempt")
+
         // Method 1: Try standard PKCE credential
         val credential = try {
             Auth.getDbxCredential()
         } catch (e: Exception) {
-            android.util.Log.e("DropboxManager", "Error getting credential", e)
+            if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "Error getting PKCE credential: ${e.javaClass.simpleName}")
             null
         }
-        
-        android.util.Log.d("DropboxManager", "  PKCE Credential: ${credential != null}")
-        
+
         if (credential?.accessToken != null) {
             settings.dropboxAccessToken = credential.accessToken
-            android.util.Log.d("DropboxManager", "✓ PKCE Token saved: ${credential.accessToken.take(20)}...")
+            if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "PKCE token saved")
             return true
         }
-        
-        // Method 2: Try legacy OAuth2 token
-        val legacyToken = try {
-            Auth.getOAuth2Token()
-        } catch (e: Exception) {
-            android.util.Log.e("DropboxManager", "Error getting legacy token", e)
-            null
-        }
-        
-        android.util.Log.d("DropboxManager", "  Legacy token: ${legacyToken != null}")
-        
-        if (!legacyToken.isNullOrEmpty()) {
-            settings.dropboxAccessToken = legacyToken
-            android.util.Log.d("DropboxManager", "✓ Legacy token saved: ${legacyToken.take(20)}...")
-            return true
-        }
-        
-        // Method 3: Try to read from Dropbox SDK's internal SharedPreferences
-        try {
-            val dbxPrefs = context.getSharedPreferences("com.dropbox.core.android", android.content.Context.MODE_PRIVATE)
-            val savedCredential = dbxPrefs.getString("credential", null)
-            android.util.Log.d("DropboxManager", "  Dropbox internal prefs credential: ${savedCredential != null}")
-            if (savedCredential != null) {
-                // Parse the JSON credential
-                val json = org.json.JSONObject(savedCredential)
-                val accessToken = json.optString("access_token", "")
-                if (accessToken.isNotEmpty()) {
-                    settings.dropboxAccessToken = accessToken
-                    android.util.Log.d("DropboxManager", "✓ Token from prefs saved: ${accessToken.take(20)}...")
-                    return true
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("DropboxManager", "Error reading Dropbox prefs", e)
-        }
-        
-        android.util.Log.w("DropboxManager", "✗ No token available from any source")
+
+        if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "No PKCE credential available")
         return false
     }
     
@@ -158,47 +121,29 @@ class DropboxManager(private val context: Context) {
      */
     suspend fun uploadBackup(databaseFile: File, databaseName: String): Result<FileMetadata> = withContext(Dispatchers.IO) {
         try {
-            android.util.Log.d("DropboxManager", "===== Upload Backup Start =====")
-            android.util.Log.d("DropboxManager", "Database file: ${databaseFile.absolutePath}")
-            android.util.Log.d("DropboxManager", "Database exists: ${databaseFile.exists()}")
-            android.util.Log.d("DropboxManager", "Database size: ${databaseFile.length()} bytes")
-            
-            val accessToken = settings.dropboxAccessToken
-            android.util.Log.d("DropboxManager", "Access token length: ${accessToken.length}")
-            android.util.Log.d("DropboxManager", "Access token prefix: ${accessToken.take(20)}...")
-            
             val client = getClient() ?: return@withContext Result.failure(
                 Exception("Not authenticated. Please connect to Dropbox first.")
             )
-            
-            android.util.Log.d("DropboxManager", "Client created successfully")
-            
+
             if (!databaseFile.exists()) {
                 return@withContext Result.failure(Exception("Database file not found"))
             }
-            
-            // Generate backup filename with timestamp
+
             val timestamp = SimpleDateFormat(TIMESTAMP_FORMAT, Locale.US).format(Date())
             val backupFileName = "${databaseName}_$timestamp.sqlite"
             val remotePath = "$BACKUP_FOLDER/$backupFileName"
-            
-            android.util.Log.d("DropboxManager", "Uploading to: $remotePath")
-            
-            // Upload file
+
             FileInputStream(databaseFile).use { inputStream ->
-                android.util.Log.d("DropboxManager", "Starting upload...")
                 val metadata = client.files()
                     .uploadBuilder(remotePath)
                     .withMode(WriteMode.ADD)
                     .uploadAndFinish(inputStream)
-                
-                android.util.Log.d("DropboxManager", "✓ Upload successful: ${metadata.name}")
+
+                if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "Upload successful: ${metadata.name}")
                 Result.success(metadata)
             }
         } catch (e: Exception) {
-            android.util.Log.e("DropboxManager", "✗ Upload failed", e)
-            android.util.Log.e("DropboxManager", "Error type: ${e.javaClass.simpleName}")
-            android.util.Log.e("DropboxManager", "Error message: ${e.message}")
+            if (BuildConfig.DEBUG) android.util.Log.w("DropboxManager", "Upload failed: ${e.javaClass.simpleName}")
             Result.failure(e)
         }
     }

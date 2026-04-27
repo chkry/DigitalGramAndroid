@@ -4,8 +4,14 @@ import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.media.ExifInterface
+import android.view.View
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object ImageUtils {
     fun loadOrientedBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap? {
@@ -41,4 +47,40 @@ object ImageUtils {
         val matrix = Matrix().apply { postScale(sx, sy) }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
+}
+
+object ImageUtilsAsync {
+    @Volatile private var cached: Pair<String, Bitmap>? = null
+
+    private fun decodeSampled(cr: ContentResolver, uri: Uri, reqW: Int, reqH: Int): Bitmap? {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        var sample = 1
+        val (h, w) = opts.outHeight to opts.outWidth
+        if (h > reqH || w > reqW) {
+            val halfH = h / 2; val halfW = w / 2
+            while (halfH / sample >= reqH && halfW / sample >= reqW) sample *= 2
+        }
+        val decode = BitmapFactory.Options().apply { inSampleSize = sample }
+        return cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decode) }
+    }
+
+    suspend fun getWallpaper(cr: ContentResolver, uri: Uri, reqW: Int, reqH: Int): Bitmap? = withContext(Dispatchers.IO) {
+        val key = uri.toString()
+        cached?.takeIf { it.first == key }?.second?.let { return@withContext it }
+        val bmp = decodeSampled(cr, uri, reqW, reqH) ?: return@withContext null
+        cached = key to bmp
+        bmp
+    }
+
+    fun loadWallpaperAsync(cr: ContentResolver, uri: Uri, target: View, resources: android.content.res.Resources, scope: CoroutineScope) {
+        val w = target.width.coerceAtLeast(512)
+        val h = target.height.coerceAtLeast(512)
+        scope.launch {
+            val bmp = getWallpaper(cr, uri, w, h) ?: return@launch
+            withContext(Dispatchers.Main) { target.background = BitmapDrawable(resources, bmp) }
+        }
+    }
+
+    fun clearCache() { cached = null }
 }

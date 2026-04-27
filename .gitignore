@@ -111,3 +111,5 @@ app/build/generated/ksp/
 
 # Room schema export directory
 app/schemas/
+# Added by code-review-graph
+.code-review-graph/

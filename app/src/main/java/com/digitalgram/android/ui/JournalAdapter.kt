@@ -17,8 +17,13 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 sealed class TimelineItem {
-    data class DotOnly(val date: Calendar, val isToday: Boolean) : TimelineItem()
-    data class EntryWithDot(val entry: JournalEntry, val isToday: Boolean) : TimelineItem()
+    abstract val id: Long
+    data class DotOnly(val date: Calendar, val isToday: Boolean) : TimelineItem() {
+        override val id: Long get() = date.hashCode().toLong() shl 1
+    }
+    data class EntryWithDot(val entry: JournalEntry, val isToday: Boolean) : TimelineItem() {
+        override val id: Long get() = (entry.date.hashCode().toLong() shl 1) or 1L
+    }
 }
 
 class JournalAdapter(
@@ -32,23 +37,14 @@ class JournalAdapter(
         private const val PAYLOAD_RERENDER = "rerender"
 
         private val DIFF = object : DiffUtil.ItemCallback<TimelineItem>() {
-            override fun areItemsTheSame(a: TimelineItem, b: TimelineItem): Boolean = when {
-                a is TimelineItem.DotOnly && b is TimelineItem.DotOnly ->
-                    a.date.timeInMillis == b.date.timeInMillis
-                a is TimelineItem.EntryWithDot && b is TimelineItem.EntryWithDot ->
-                    a.entry.date == b.entry.date
-                else -> false
-            }
+            override fun areItemsTheSame(a: TimelineItem, b: TimelineItem): Boolean =
+                a.id == b.id
 
-            override fun areContentsTheSame(a: TimelineItem, b: TimelineItem): Boolean = when {
-                a is TimelineItem.DotOnly && b is TimelineItem.DotOnly ->
-                    a.isToday == b.isToday
-                a is TimelineItem.EntryWithDot && b is TimelineItem.EntryWithDot ->
-                    a.isToday == b.isToday &&
-                    a.entry.content == b.entry.content &&
-                    a.entry.updated == b.entry.updated
-                else -> false
-            }
+            override fun areContentsTheSame(a: TimelineItem, b: TimelineItem): Boolean =
+                a == b
+
+            override fun getChangePayload(oldItem: TimelineItem, newItem: TimelineItem): Any? =
+                null
         }
     }
 
@@ -57,6 +53,16 @@ class JournalAdapter(
     private var themeColors: ThemeColors = ThemeColors.getTheme(AppSettings.THEME_DEFAULT)
     private var fontSizeSp: Float = 16f
     private var borderStyle: String = AppSettings.BORDER_A
+
+    private val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
+    private val dateFormat = SimpleDateFormat("d", Locale.getDefault())
+    private val dotDrawable = android.graphics.drawable.GradientDrawable().apply {
+        shape = android.graphics.drawable.GradientDrawable.OVAL
+    }
+    private val dateBoxDrawable = android.graphics.drawable.GradientDrawable().apply {
+        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+        cornerRadius = 8f
+    }
 
     // Parsed-markdown cache. Spans embed theme colors, so the cache is invalidated
     // whenever the theme changes.
@@ -226,11 +232,8 @@ class JournalAdapter(
 
         fun applyStyle(item: TimelineItem.DotOnly) {
             val dotColor = if (item.isToday) themeColors.todayDotColor else themeColors.dotColor
-            val drawable = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(dotColor)
-            }
-            binding.timelineDot.background = drawable
+            dotDrawable.setColor(dotColor)
+            binding.timelineDot.background = dotDrawable
             binding.lineTop.visibility = View.GONE
             binding.lineBottom.visibility = View.GONE
         }
@@ -255,14 +258,9 @@ class JournalAdapter(
         fun bind(item: TimelineItem.EntryWithDot) {
             val entry = item.entry
             val date = entry.toDate()
-
-            val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
-            val dateFormat = SimpleDateFormat("d", Locale.getDefault())
-
             binding.dayName.text = dayFormat.format(date).uppercase()
             binding.dayNumber.text = dateFormat.format(date)
             binding.entryContent.text = parsePreview(entry.content)
-
             applyStyle(item)
         }
 
@@ -270,26 +268,23 @@ class JournalAdapter(
             binding.entryContent.textSize = fontSizeSp
             binding.entryContent.setTextColor(themeColors.textColor)
             binding.dayName.setTextColor(themeColors.accentColor)
-            binding.dayNumber.setTextColor(themeColors.textColor)
+            val dow = Calendar.getInstance().apply {
+                set(Calendar.YEAR, item.entry.year)
+                set(Calendar.MONTH, item.entry.month - 1)
+                set(Calendar.DAY_OF_MONTH, item.entry.day)
+            }.get(Calendar.DAY_OF_WEEK)
+            val isWeekend = dow == Calendar.SATURDAY || dow == Calendar.SUNDAY
+            binding.dayNumber.setTextColor(if (isWeekend) themeColors.accentColor else themeColors.textColor)
             binding.entryCard.setCardBackgroundColor(themeColors.backgroundColor)
             binding.entryCard.strokeColor = themeColors.borderColor
             binding.entryCard.strokeWidth = getBorderWidth(borderStyle)
 
-            val dateBoxDrawable = binding.dateBox.background
-            if (dateBoxDrawable is android.graphics.drawable.GradientDrawable) {
-                dateBoxDrawable.setColor(themeColors.dateBackgroundColor)
-            } else {
-                binding.dateBox.background = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                    setColor(themeColors.dateBackgroundColor)
-                }
-            }
+            dateBoxDrawable.setColor(themeColors.dateBackgroundColor)
+            binding.dateBox.background = dateBoxDrawable
 
             val dotColor = if (item.isToday) themeColors.todayDotColor else themeColors.dotColor
-            binding.timelineDot.background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(dotColor)
-            }
+            dotDrawable.setColor(dotColor)
+            binding.timelineDot.background = dotDrawable
 
             binding.lineTop.visibility = View.GONE
             binding.lineBottom.visibility = View.GONE

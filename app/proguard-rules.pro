@@ -20,11 +20,7 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
-# Keep Room entities
 -keep class com.digitalgram.android.data.** { *; }
-
-# Keep ViewModel classes
--keep class com.digitalgram.android.ui.** { *; }
 
 # JSR 305 annotations
 -dontwarn javax.annotation.**
@@ -34,9 +30,21 @@
 -dontwarn com.google.errorprone.annotations.**
 -keep class com.google.crypto.tink.** { *; }
 
-# Google API client (not used but referenced by Tink)
+# Google Sign-In is Play Services (device-provided, not in APK)
+-dontwarn com.google.android.gms.**
+
+# Google Drive — model classes are JSON-deserialized via GenericData reflection
+-keepclassmembers class com.google.api.services.drive.model.** { *; }
 -dontwarn com.google.api.client.**
+-dontwarn com.google.api.services.drive.**
 -dontwarn org.joda.time.**
+-dontwarn org.apache.http.**
+-dontwarn org.ietf.jgss.**
+-dontwarn org.apache.commons.**
+
+# Dropbox — DbxCredential is JSON-serialized when storing the auth token
+-keep class com.dropbox.core.oauth.DbxCredential { *; }
+-dontwarn com.dropbox.core.**
 
 # Security: Remove logging in release builds
 -assumenosideeffects class android.util.Log {
