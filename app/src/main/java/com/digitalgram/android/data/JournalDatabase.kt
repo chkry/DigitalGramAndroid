@@ -719,6 +719,12 @@ class JournalDatabase private constructor(
 
     fun cancelScope() { scopeJob.cancel() }
 
+    fun checkpoint() {
+        try {
+            dbHelper?.writableDatabase?.execSQL("PRAGMA wal_checkpoint(TRUNCATE)")
+        } catch (_: Exception) {}
+    }
+
     fun close() {
         dbHelper?.close()
         dbHelper = null

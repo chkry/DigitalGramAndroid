@@ -56,13 +56,6 @@ class JournalAdapter(
 
     private val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
     private val dateFormat = SimpleDateFormat("d", Locale.getDefault())
-    private val dotDrawable = android.graphics.drawable.GradientDrawable().apply {
-        shape = android.graphics.drawable.GradientDrawable.OVAL
-    }
-    private val dateBoxDrawable = android.graphics.drawable.GradientDrawable().apply {
-        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-        cornerRadius = 8f
-    }
 
     // Parsed-markdown cache. Spans embed theme colors, so the cache is invalidated
     // whenever the theme changes.
@@ -140,13 +133,6 @@ class JournalAdapter(
                     dayCalendar.get(Calendar.DAY_OF_MONTH) == today.get(Calendar.DAY_OF_MONTH)
 
             val entry = entriesMap[dateKey]
-            val isFuture = day > today.get(Calendar.DAY_OF_MONTH) &&
-                    year == today.get(Calendar.YEAR) &&
-                    month == today.get(Calendar.MONTH)
-
-            if (isFuture && (entry == null || entry.content.isBlank())) {
-                continue
-            }
 
             if (entry != null && entry.content.isNotBlank()) {
                 newItems.add(TimelineItem.EntryWithDot(entry, isToday))
@@ -214,6 +200,10 @@ class JournalAdapter(
         private val binding: ItemTimelineDotBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
+        private val dotDrawable = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+        }
+
         init {
             binding.root.setOnClickListener {
                 val pos = bindingAdapterPosition
@@ -231,7 +221,12 @@ class JournalAdapter(
         }
 
         fun applyStyle(item: TimelineItem.DotOnly) {
-            val dotColor = if (item.isToday) themeColors.todayDotColor else themeColors.dotColor
+            val isSunday = item.date.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+            val dotColor = when {
+                item.isToday -> themeColors.todayDotColor
+                isSunday     -> themeColors.accentColor
+                else         -> themeColors.dotColor
+            }
             dotDrawable.setColor(dotColor)
             binding.timelineDot.background = dotDrawable
             binding.lineTop.visibility = View.GONE
@@ -242,6 +237,14 @@ class JournalAdapter(
     inner class EntryViewHolder(
         private val binding: ItemDiaryEntryBinding
     ) : RecyclerView.ViewHolder(binding.root) {
+
+        private val dotDrawable = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+        }
+        private val dateBoxDrawable = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = 8f
+        }
 
         init {
             binding.entryCard.setOnClickListener {
@@ -265,16 +268,17 @@ class JournalAdapter(
         }
 
         fun applyStyle(item: TimelineItem.EntryWithDot) {
-            binding.entryContent.textSize = fontSizeSp
-            binding.entryContent.setTextColor(themeColors.textColor)
-            binding.dayName.setTextColor(themeColors.accentColor)
-            val dow = Calendar.getInstance().apply {
+            val isSunday = Calendar.getInstance().apply {
                 set(Calendar.YEAR, item.entry.year)
                 set(Calendar.MONTH, item.entry.month - 1)
                 set(Calendar.DAY_OF_MONTH, item.entry.day)
-            }.get(Calendar.DAY_OF_WEEK)
-            val isWeekend = dow == Calendar.SATURDAY || dow == Calendar.SUNDAY
-            binding.dayNumber.setTextColor(if (isWeekend) themeColors.accentColor else themeColors.textColor)
+            }.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+
+            binding.entryContent.textSize = fontSizeSp
+            binding.entryContent.setTextColor(themeColors.textColor)
+            binding.dayName.setTextColor(themeColors.accentColor)
+            binding.dayNumber.setTextColor(if (isSunday) themeColors.accentColor else themeColors.textColor)
+
             binding.entryCard.setCardBackgroundColor(themeColors.backgroundColor)
             binding.entryCard.strokeColor = themeColors.borderColor
             binding.entryCard.strokeWidth = getBorderWidth(borderStyle)
@@ -282,7 +286,11 @@ class JournalAdapter(
             dateBoxDrawable.setColor(themeColors.dateBackgroundColor)
             binding.dateBox.background = dateBoxDrawable
 
-            val dotColor = if (item.isToday) themeColors.todayDotColor else themeColors.dotColor
+            val dotColor = when {
+                item.isToday -> themeColors.todayDotColor
+                isSunday     -> themeColors.accentColor
+                else         -> themeColors.dotColor
+            }
             dotDrawable.setColor(dotColor)
             binding.timelineDot.background = dotDrawable
 

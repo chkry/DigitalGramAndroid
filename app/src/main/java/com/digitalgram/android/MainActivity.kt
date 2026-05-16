@@ -453,8 +453,15 @@ class MainActivity : AppCompatActivity() {
             adapter.setCurrentMonth(currentMonth)
             adapter.submitEntries(entries) {
                 val itemCount = adapter.itemCount
-                if (itemCount > 0) {
-                    binding.recyclerView.scrollToPosition(itemCount - 1)
+                binding.recyclerView.post {
+                    val todayPos = adapter.getTodayPosition()
+                    val lm = binding.recyclerView.layoutManager as LinearLayoutManager
+                    if (todayPos >= 0) {
+                        val offset = (binding.recyclerView.height * 0.85f).toInt()
+                        lm.scrollToPositionWithOffset(todayPos, offset)
+                    } else if (itemCount > 0) {
+                        lm.scrollToPositionWithOffset(itemCount - 1, 0)
+                    }
                 }
             }
 

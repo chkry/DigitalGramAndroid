@@ -1001,12 +1001,15 @@ class SettingsActivity : AppCompatActivity() {
         val database = JournalDatabase.getInstance(applicationContext)
         val currentDb = database.getCurrentDatabaseName()
         val dbFile = getDatabasePath(currentDb)
-        
+
         if (!dbFile.exists()) {
             Toast.makeText(this, "Database file not found", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
+        // Flush WAL into main file so the copied snapshot contains all data
+        database.checkpoint()
+
         try {
             // Create share intent
             val exportDir = File(cacheDir, "export")
@@ -1522,7 +1525,10 @@ class SettingsActivity : AppCompatActivity() {
                 val database = JournalDatabase.getInstance(applicationContext)
                 val dbName = database.getCurrentDatabaseName()
                 val dbFile = getDatabasePath(dbName)
-                
+
+                // Flush WAL into main file so the streamed snapshot contains all data
+                database.checkpoint()
+
                 contentResolver.openOutputStream(uri)?.use { output ->
                     FileInputStream(dbFile).use { input ->
                         input.copyTo(output)
@@ -1830,13 +1836,14 @@ class SettingsActivity : AppCompatActivity() {
         val database = JournalDatabase.getInstance(applicationContext)
         val databaseFile = getDatabasePath(settings.currentDatabase)
         val databaseName = settings.currentDatabase.removeSuffix(".sqlite").removeSuffix(".db")
-        
+
         if (!databaseFile.exists()) {
             Toast.makeText(this, "Database file not found", Toast.LENGTH_SHORT).show()
             return
         }
-        
-        // Close database before backup
+
+        // Flush WAL into main file so the copied file contains all data
+        database.checkpoint()
         database.close()
         
         binding.dropboxBackupButton.isEnabled = false
@@ -2170,9 +2177,10 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
         
-        // Close database before backup
+        // Flush WAL into main file so the copied file contains all data
+        database.checkpoint()
         database.close()
-        
+
         binding.googleDriveBackupButton.isEnabled = false
         binding.googleDriveBackupButton.text = "Uploading..."
         
